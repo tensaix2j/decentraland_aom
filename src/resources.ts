@@ -13,7 +13,17 @@ export default {
 		archer: new GLTFShape("models/archer.gltf")
 	},
 	textures: {
+		skeleton: new Texture("models/skeleton_ui.png"),
+		giant: new Texture("models/giant_ui.png"),
+		knight: new Texture("models/knight_ui.png"),
+		wizard: new Texture("models/wizard_ui.png"),
+		goblin: new Texture("models/goblin_ui.png"),
+		devil: new Texture("models/devil_ui.png"),
+		archer: new Texture("models/archer_ui.png"),
+		devilhorde: new Texture("models/devilhorde_ui.png")
 	}
+
+	
 };
 
 

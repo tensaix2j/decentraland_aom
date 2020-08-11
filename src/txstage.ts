@@ -15,6 +15,7 @@ import {b2ContactListener} from "src/Box2D/Dynamics/b2WorldCallbacks"
 
 import resources from "src/resources";
 import { Txunit } from "src/txunit";
+import { Txcard } from "src/txcard";
 
 export class Txstage extends Entity {
 
@@ -25,7 +26,12 @@ export class Txstage extends Entity {
 	public world;
 	public units = [];
 	public battleground;
+	public playerindex = 1;
 
+	public debugsetting ;
+	public cards_in_use = [];
+	public card_sel_highlight;
+	public card_sel_index = 0;
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -47,6 +53,10 @@ export class Txstage extends Entity {
             position: new Vector3( 0, 1.4 ,0 ),
             scale   : new Vector3( 1, 1, 1 )
         });
+
+        
+        
+
         let battleground_shape = resources.models.battleground;
 
         battleground.addComponent( battleground_shape );
@@ -59,6 +69,9 @@ export class Txstage extends Entity {
 
         
         let _this = this;
+
+
+
         this.construct_box2d_shapes();
         
 
@@ -67,12 +80,14 @@ export class Txstage extends Entity {
         
 
 
-        let tower_x = [ -2.95 , 2.95, -2.95,      2.95  , 0, 0 ];
-        let tower_z = [  4.55  , 4.55,   -4.55,   -4.55 , 6.7 , -6.7];
+        let tower_x  = [ -2.95  , 2.95,    0,  -2.95,    2.95,        0  ];
+        let tower_z  = [  4.55  , 4.55,  6.7,  -4.55,   -4.55,     -6.7  ];
+        let tower_sx = [   1.5,    1.5,  2.0,    1.5,     1.5,      2.0  ];
+        let tower_sz = [   1.5 ,   1.5,  1.5,    1.5,     1.5,      1.5  ];
+        let tower_o =  [    -1 ,    -1,   -1,      1,       1,        1  ];
 
+        let tower_aggrorange = 3.0;
 
-        let tower_sx = [ 1.5,  1.5, 1.5,  1.5,     2.0, 2.0 ];
-        let tower_sz = [ 1.5 , 1.5, 1.5,  1.5,     1.5, 1.5 ];
 
         for ( i = 0 ; i < tower_x.length ; i++ ) {
 
@@ -81,10 +96,10 @@ export class Txstage extends Entity {
 	      	let z = tower_z[i];
 	      	let sx = tower_sx[i];
 	      	let sz = tower_sz[i];
-
-	      	
+	      	let owner = tower_o[i];
+	      		
 	      	let tower = new Txunit( 
-	      			"b" + i , 
+	      			this.units.length, 
 	      			this, 
 	      			{
 	      				position: new Vector3( x,  2, z ),
@@ -94,13 +109,99 @@ export class Txstage extends Entity {
 	      				scale   : new Vector3( sx, 1, sz )
 	      			},
 	      			resources.models.tower,
-	      			"box"
+                    "tower",
+	      			"static",
+	      			owner,
+	      			0,
+	      			tower_aggrorange
 	      	);
+	      	
+			
 	      	this.units.push( tower );
     	}
 
 
     	
+    	this.random_initial_cards();
+
+    	let card_sel_parent = new Entity();
+    	card_sel_parent.addComponent( new Transform( {
+    		position: new Vector3( -8 , 2, 0 )
+    	}));
+    	card_sel_parent.setParent( this );
+    	card_sel_parent.addComponent( new Billboard( false, true, false ) );
+
+
+    	let card_sel_3d_ui = new Entity();
+    	card_sel_3d_ui.setParent(card_sel_parent);
+    	
+    	let card_sel_3d_ui_transform = new Transform( {
+    		position: new Vector3( 0, 0, 0 ),
+    	});
+    	card_sel_3d_ui.addComponent( card_sel_3d_ui_transform );  
+    	card_sel_3d_ui_transform.rotation.eulerAngles = new Vector3( 0 , 180, 0 );
+    	
+
+    	
+    	// Individual cards
+    	for ( i = 0 ; i < this.cards_in_use.length ; i++ ) {
+
+    		let x = ( i % 2 ) * 1.2;
+    		let y = ((i / 2)  >> 0 ) * 1.2;
+    		let z = 0;
+
+    		new Txcard(
+    			"c" + i ,
+    			card_sel_3d_ui,
+    			{
+    				position: new Vector3( x, y, z),
+    				scale   : new Vector3(1, 1, 1)
+    			},
+    			this.cards_in_use[i],
+    			this
+    		);
+    	}
+    	// Card selected highlight 
+    	
+    	let card_sel_highlight_material = new Material();
+    	card_sel_highlight_material.emissiveColor = Color3.Green();
+    	card_sel_highlight_material.emissiveIntensity = 4.0;
+
+
+    	this.card_sel_highlight = new Entity();
+    	this.card_sel_highlight.setParent( card_sel_3d_ui );
+    	this.card_sel_highlight.addComponent( new BoxShape() );
+    	this.card_sel_highlight.addComponent( new Transform( {
+    		position: new Vector3(0,   0  ,  0.08),
+    		scale   : new Vector3(1.1 , 1.1,  0.1)
+    	}));
+    	this.card_sel_highlight.addComponent( card_sel_highlight_material );
+
+		    
+
+
+        
+
+
+		// Setup sensor for unit's aggro
+		let contactListener = new b2ContactListener();
+		contactListener.BeginContact = function (contact) {
+
+			
+		}
+
+		contactListener.EndContact = function (contact) {
+		  	
+		}
+		contactListener.PostSolve = function (contact, impulse) {
+
+		}
+		contactListener.PreSolve = function (contact, oldManifold) {
+
+		}
+		this.world.SetContactListener(contactListener);	  	
+    	
+
 
     	/*
 		let ruler = new Entity();
@@ -111,6 +212,10 @@ export class Txstage extends Entity {
 		});
 		ruler.addComponent( new BoxShape() );
 		*/
+
+		this.playerindex = -1;
+		this.createUnit( "goblin" , -1.5 , 1.5 );
+		this.playerindex = 1;
 
 
     	battleground.addComponent( 
@@ -166,14 +271,21 @@ export class Txstage extends Entity {
 					let place_x = e.hit.hitPoint.x - this.transform.position.x;
 					let place_z = e.hit.hitPoint.z - this.transform.position.z;
 					
-					this.createUnit("skeleton", place_x , place_z );
+					if ( this.card_sel_index >= 0 ) {
+						let type = this.cards_in_use[ this.card_sel_index ] ;
+						this.createUnit( type , place_x , place_z );
+										
+					}
 
 				}
 			}
 
-        } else if ( e.buttonId == 2  ) {
-
-        	
+        } else if ( e.buttonId == 1  ) {
+        	// E button
+        	this.playerindex = 1;
+        } else if ( e.buttonId == 2 ) {
+        	// F button 	
+        	this.playerindex = -1;
         }	
      }
 
@@ -186,26 +298,89 @@ export class Txstage extends Entity {
 
 
 
+    //---------------------------
+    card_input_down( e, txcard ) {
+
+    	this.card_sel_highlight.getComponent(Transform).position.x = txcard.transform.position.x;
+    	this.card_sel_highlight.getComponent(Transform).position.y = txcard.transform.position.y;
+    	
+    	this.card_sel_index = this.cards_in_use.indexOf( txcard.type );
+
+    }
+
+
+
+    //---------------------------
+    card_input_up( e, type ) {
+    
+    }
 
 
 
 
 
+     //----
+     random_initial_cards() {
+
+     	this.cards_in_use.length = 0;
+     	this.cards_in_use.push("skeleton");
+		this.cards_in_use.push("giant");
+    	this.cards_in_use.push("knight");
+    	this.cards_in_use.push("archer");
+    	this.cards_in_use.push("wizard");
+    	this.cards_in_use.push("goblin");
+    	this.cards_in_use.push("devil");
+		this.cards_in_use.push("devilhorde");
+
+     }
+
+    //------------
+    getRecyclableUnit( ) {
+        let i;
+        for ( i = 0 ; i < this.units.length ; i++ ) {
+            let u = this.units[i];
+            if ( u.dead == 2 ) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
 
     //---------------------
     createUnit( type , x, z) {
 
+    	log( "createUnit" , type, x, z );
+
     	let y ;
     	let modelsize;
     	let b2dsize;
     	let model;
+    	let attackRange = 0.5;
+    	let aggrorange  = 2.5;
+        let isFlying     = 0;
+        
+        let speed        = 5;
+        let maxhp:number = 67;
+        let hp:number    = 67;
+
+        let attackSpeed  = 1;
+        let damage:number = 67;
+
+
+    	// Box2d's collision grouping
+    	let categoryBits = 1;
+    	let maskBits 	 = 1;
+
 
     	if ( type == "skeleton" ) {
     		y 			= 1.6;
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.skeleton;
+    		maxhp       = 99;
+            damage      = 67;
+
     	
     	} else if ( type == "giant" ) {
 
@@ -242,56 +417,94 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.goblin;
-    		
-    	
+    		speed 		= 5.0;
+    		maxhp       = 167;
+    	    damage      = 99;
 
     	} else if ( type == "devil" ) {
-    		y 			= 2.2;
+    		
+    		y 			= 2.7;
     		modelsize 	= 0.25;
     		b2dsize  	= 0.25;
     		model 		= resources.models.devil;
-    		
-    	} else if ( type == "devilminion" ) {
-    		y 			= 2.2;
+    		isFlying    = 1;
+
+
+    	} else if ( type == "devilhorde" ) {
+    		y 			= 2.7;
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.devil;
-    		
-    		
-
+    		isFlying    = 1;
     	} 
 
-    	let unit = new Txunit(
-	    		type,
-	    		this,
-	    		{
-	  				position: new Vector3( x , y ,  z ),
-	  				scale   : new Vector3( modelsize, modelsize, modelsize )
-	  			},
-	  			{
-	  				scale   : new Vector3( b2dsize , b2dsize , b2dsize )
-	  			},
-	  			model,
-	  			"circle"
-	  		);
+        let unit:Txunit;
+        let recyclable_index = this.getRecyclableUnit();
+        if ( recyclable_index == -1 ) {
 
 
-    	let target;
+            unit = new Txunit(
+    	    		this.units.length,
+    	    		this,
+    	    		{
+    	  				position: new Vector3( x , y ,  z ),
+    	  				scale   : new Vector3( modelsize, modelsize, modelsize )
+    	  			},
+    	  			{
+    	  				scale   : new Vector3( b2dsize , b2dsize , b2dsize )
+    	  			},
+    	  			model,
+                    type,
+    	  			"dynamic",
+    	  			this.playerindex,
+    	  			isFlying,
+    	  			aggrorange
+    	  		);
+        } else {
 
-    	target = new Transform();
-    	target.position.x = -3;
-    	target.position.z = 0;
-    	unit.walking_queue.push( target );
+            unit = this.units[recyclable_index];
+            unit.transform.position = new Vector3( x, y, z );
+            unit.transform.scale    = new Vector3( modelsize, modelsize, modelsize );
+            unit.type = type;
+            unit.shapetype = "dynamic";
+            unit.owner = this.playerindex;
+            unit.isFlying = isFlying;
+            unit.aggroRange = aggrorange;
+            unit.reinstate_box2d( {
+                scale   : new Vector3( b2dsize , b2dsize , b2dsize )
+            });
+            unit.dead = 0;
+            unit.tick = 0;
+            unit.healthbar.getComponent( Transform ).scale.x = 1.5;
+            unit.removeComponent( GLTFShape );
+            unit.addComponent( model );
+            unit.reinit();
+            
+        }	
+
+        
+        unit.hp          = maxhp;
+        unit.maxhp       = maxhp;
+    	unit.attackRange = attackRange;
+    	unit.speed 		 = speed;
+        unit.attackSpeed = attackSpeed;
+        unit.damage      = damage;
 
 
-    	target = new Transform();
-    	target.position.x = this.units[0].transform.position.x;
-    	target.position.z = this.units[0].transform.position.z;
-    	unit.walking_queue.push( target );
 
-    	this.units.push( unit );
+    	if ( unit.isFlying == 1 ) {
+    		categoryBits = 2;
+    		maskBits     = 2;
+    	}
+    	unit.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
+		unit.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
+
+		this.units.push( unit );
     	return unit;
     }
+
+
+    
 
 
 	//-----------------
@@ -438,19 +651,42 @@ export class Txstage extends Entity {
 		
         let fixDef          = new b2FixtureDef();
         fixDef.density      = 20;
-        fixDef.friction     = 100;
+        fixDef.friction     = 1;
         fixDef.restitution  = 0.5;
         fixDef.shape        = new b2CircleShape(radius);
         
         let b2body = world.CreateBody(bodyDef);
         b2body.CreateFixture(fixDef);
-        b2body.SetLinearDamping(0.6);
+        b2body.SetLinearDamping(0.1);
 		b2body.SetAngularDamping(0.1);
 
 
         return b2body;
 
     }
+
+    //-------------
+    createDynamicSensorCircle( x,y, radius , world, sensorid ) {
+
+    	// Box2D
+    	let bodyDef   = new b2BodyDef();
+        bodyDef.position.Set( x , y );
+        bodyDef.type 	= b2BodyType.b2_dynamicBody;
+        bodyDef.userData  = sensorid;
+		
+        let fixDef          = new b2FixtureDef();
+        fixDef.density      = 0.0;
+        fixDef.friction     = 0.0;
+        fixDef.restitution  = 0.0;
+        fixDef.shape        = new b2CircleShape(radius);
+        fixDef.isSensor 	= true;
+        
+        let b2body = world.CreateBody(bodyDef);
+        b2body.CreateFixture(fixDef);
+
+        return b2body;
+
+	}
 }
 
 

@@ -53,6 +53,9 @@ export class MainClass {
             camera 
         );
 
+        stage.transform.position.y = -1.4;
+        
+
         this.stages.push( stage );
 		
 		// Add system to engine

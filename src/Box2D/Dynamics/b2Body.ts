@@ -214,7 +214,7 @@ export class b2Body {
   constructor(bd: b2IBodyDef, world: b2World) {
     this.m_bulletFlag = b2Maybe(bd.bullet, false);
     this.m_fixedRotationFlag = b2Maybe(bd.fixedRotation, false);
-    this.m_autoSleepFlag = b2Maybe(bd.allowSleep, true);
+    this.m_autoSleepFlag = b2Maybe(bd.allowSleep, false);
     this.m_awakeFlag = b2Maybe(bd.awake, true);
     this.m_activeFlag = b2Maybe(bd.active, true);
 
