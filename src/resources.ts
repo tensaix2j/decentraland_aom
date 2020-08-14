@@ -2,15 +2,18 @@
 export default {
 	
 	models: {
-		battleground: new GLTFShape("models/battleground.gltf"),
-		tower: new GLTFShape("models/tower.gltf"),
-		skeleton: new GLTFShape("models/skeleton.gltf"),
-		giant: new GLTFShape("models/giant.gltf"),
-		knight: new GLTFShape("models/knight.gltf"),
-		wizard: new GLTFShape("models/wizard.gltf"),
+		battleground: new GLTFShape("models/battleground.glb"),
+		tower_r: new GLTFShape("models/tower_r.glb"),
+		tower_b: new GLTFShape("models/tower_b.glb"),
+		skeleton: new GLTFShape("models/skeleton.glb"),
+		giant: new GLTFShape("models/giant.glb"),
+		knight: new GLTFShape("models/knight.glb"),
+		wizard: new GLTFShape("models/wizard.glb"),
 		goblin: new GLTFShape("models/goblin.gltf"),
 		devil: new GLTFShape("models/devil.gltf"),
-		archer: new GLTFShape("models/archer.gltf")
+		archer: new GLTFShape("models/archer.glb"),
+		arrow: new GLTFShape("models/arrow.glb"),
+		fireball: new GLTFShape("models/fireball.glb")
 	},
 	textures: {
 		skeleton: new Texture("models/skeleton_ui.png"),

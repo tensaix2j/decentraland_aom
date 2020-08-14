@@ -16,6 +16,8 @@ import {b2ContactListener} from "src/Box2D/Dynamics/b2WorldCallbacks"
 import resources from "src/resources";
 import { Txunit } from "src/txunit";
 import { Txcard } from "src/txcard";
+import { Txprojectile } from "src/txprojectile";
+
 
 export class Txstage extends Entity {
 
@@ -29,9 +31,13 @@ export class Txstage extends Entity {
 	public playerindex = 1;
 
 	public debugsetting ;
-	public cards_in_use = [];
 	public card_sel_highlight;
 	public card_sel_index = 0;
+
+    public projectiles = [];
+    public cards_in_use = [];
+    public txcards = [];
+    
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -74,17 +80,20 @@ export class Txstage extends Entity {
 
         this.construct_box2d_shapes();
         
-
-
         let i ;
         
 
 
         let tower_x  = [ -2.95  , 2.95,    0,  -2.95,    2.95,        0  ];
         let tower_z  = [  4.55  , 4.55,  6.7,  -4.55,   -4.55,     -6.7  ];
-        let tower_sx = [   1.5,    1.5,  2.0,    1.5,     1.5,      2.0  ];
-        let tower_sz = [   1.5 ,   1.5,  1.5,    1.5,     1.5,      1.5  ];
-        let tower_o =  [    -1 ,    -1,   -1,      1,       1,        1  ];
+        let tower_r  = [   1.0,    1.0,  1.5,    1.0,     1.0,      1.5  ];
+        let tower_o  = [    -1 ,    -1,   -1,      1,       1,        1  ];
+        let tower_m  = [ resources.models.tower_b ,
+                         resources.models.tower_b ,
+                         resources.models.tower_b ,
+                         resources.models.tower_r ,
+                         resources.models.tower_r ,
+                         resources.models.tower_r ] 
 
         let tower_aggrorange = 3.0;
 
@@ -94,30 +103,37 @@ export class Txstage extends Entity {
 	      	
 	      	let x = tower_x[i];
 	      	let z = tower_z[i];
-	      	let sx = tower_sx[i];
-	      	let sz = tower_sz[i];
+	      	let r = tower_r[i];
+            let model = tower_m[i];
 	      	let owner = tower_o[i];
-	      		
+	      		   
 	      	let tower = new Txunit( 
 	      			this.units.length, 
 	      			this, 
 	      			{
 	      				position: new Vector3( x,  2, z ),
-	      				scale   : new Vector3( sx, 1, sz )
+	      				scale   : new Vector3( r, 1,  r )
 	      			},
 	      			{
-	      				scale   : new Vector3( sx, 1, sz )
+	      				scale   : new Vector3( r,  r , r )
 	      			},
-	      			resources.models.tower,
+	      			model,
                     "tower",
 	      			"static",
 	      			owner,
 	      			0,
-	      			tower_aggrorange
+	      			tower_aggrorange,
+                    1.5
 	      	);
-	      	
-			
-	      	this.units.push( tower );
+
+            tower.attackRange   = 10.0;
+            tower.maxhp         = 14400;
+            tower.curhp         = tower.maxhp;
+            tower.damage        = 60;
+            tower.projectile_user = 1;
+
+
+            this.units.push( tower );
     	}
 
 
@@ -150,7 +166,7 @@ export class Txstage extends Entity {
     		let y = ((i / 2)  >> 0 ) * 1.2;
     		let z = 0;
 
-    		new Txcard(
+    		let txcard = new Txcard(
     			"c" + i ,
     			card_sel_3d_ui,
     			{
@@ -160,6 +176,8 @@ export class Txstage extends Entity {
     			this.cards_in_use[i],
     			this
     		);
+
+            this.txcards.push( txcard );
     	}
     	// Card selected highlight 
     	
@@ -183,25 +201,6 @@ export class Txstage extends Entity {
         
 
 
-		// Setup sensor for unit's aggro
-		let contactListener = new b2ContactListener();
-		contactListener.BeginContact = function (contact) {
-
-			
-		}
-
-		contactListener.EndContact = function (contact) {
-		  	
-		}
-		contactListener.PostSolve = function (contact, impulse) {
-
-		}
-		contactListener.PreSolve = function (contact, oldManifold) {
-
-		}
-		this.world.SetContactListener(contactListener);	  	
-    	
-
 
     	/*
 		let ruler = new Entity();
@@ -213,10 +212,13 @@ export class Txstage extends Entity {
 		ruler.addComponent( new BoxShape() );
 		*/
 
-		this.playerindex = -1;
-		this.createUnit( "goblin" , -1.5 , 1.5 );
-		this.playerindex = 1;
 
+
+        this.card_input_down( null, this.txcards[4] );
+
+   
+
+		
 
     	battleground.addComponent( 
 			new OnPointerDown((e) => {
@@ -229,7 +231,8 @@ export class Txstage extends Entity {
 			})
 		);
 
-		
+
+
     }   
 
 
@@ -241,20 +244,33 @@ export class Txstage extends Entity {
 	step(dt:number) {
     	
     	this.world.Step( 0.05  , 10, 10 );
-    	let u;
-		for ( u = 0 ; u < this.units.length ; u++) {
-			let unit = this.units[u];
-			if ( unit.visible == 1 ) {
-				unit.update(dt);
-				unit.updatePosition_toBox2d();
-			} 
-    	}
+    	
     }
 
 
     //--
     update(dt) {
-    	this.step(dt);
+    	
+
+        this.step(dt);
+    
+        let u;
+        for ( u = 0 ; u < this.units.length ; u++) {
+            let unit = this.units[u];
+            if ( unit.visible == 1 && unit.dead < 2 ) {
+                unit.update(dt);
+                unit.updatePosition_toBox2d();
+            } 
+        }
+
+        let p;
+        for ( p = 0 ; p < this.projectiles.length ; p++ ) {
+            let projectile = this.projectiles[p];
+            if ( projectile.visible == 1 ) {
+                projectile.update(dt);
+            }
+        }
+
     }
 
 
@@ -283,9 +299,13 @@ export class Txstage extends Entity {
         } else if ( e.buttonId == 1  ) {
         	// E button
         	this.playerindex = 1;
+            
+
         } else if ( e.buttonId == 2 ) {
         	// F button 	
         	this.playerindex = -1;
+
+
         }	
      }
 
@@ -316,6 +336,62 @@ export class Txstage extends Entity {
     }
 
 
+     //------------
+    getRecyclableProjectile( type ) {
+
+        let i;
+        for ( i = 0 ; i < this.projectiles.length ; i++ ) {
+            let projectile = this.projectiles[i];
+            if ( projectile.visible == 0 && projectile.type == type ) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+
+    //------------
+    createProjectile( srcx, srcy, srcz, dstx, dsty, dstz , owner , projectile_type ) {
+
+
+        let projectile:Txprojectile;
+        let recyclable_index = this.getRecyclableProjectile( projectile_type );
+
+
+        if ( recyclable_index == -1 ) {
+            
+            let model;
+            if ( projectile_type == 1 ) {
+                model = resources.models.arrow;
+            } else if ( projectile_type == 2  ) {
+                model = resources.models.fireball;
+            }
+
+            projectile = new Txprojectile(
+                        this.projectiles.length,
+                        this,
+                        srcx, srcy, srcz, dstx, dsty, dstz,
+                        model,
+                        owner,
+                        projectile_type
+                    );
+            this.projectiles.push( projectile );
+        } else {
+
+            //log( srcx, srcy, srcz, dstx, dsty, dstz );
+            projectile = this.projectiles[recyclable_index];
+            projectile.getComponent(Transform).position = new Vector3( srcx, srcy, srcz );
+            projectile.dst_transform.position           = new Vector3( dstx, dsty, dstz );
+            projectile.owner = owner;
+            projectile_type = projectile_type;
+            projectile.reinit();
+            projectile.show();
+
+        }
+       
+        return projectile;
+    }
 
 
 
@@ -335,16 +411,21 @@ export class Txstage extends Entity {
      }
 
     //------------
-    getRecyclableUnit( ) {
+    getRecyclableUnit( type ) {
         let i;
         for ( i = 0 ; i < this.units.length ; i++ ) {
             let u = this.units[i];
-            if ( u.dead == 2 ) {
+            if ( u.dead == 2 && u.type == type ) {
                 return i;
             }
         }
         return -1;
     }
+
+
+
+ 
+
 
 
     //---------------------
@@ -356,16 +437,18 @@ export class Txstage extends Entity {
     	let modelsize;
     	let b2dsize;
     	let model;
-    	let attackRange = 0.5;
+    	let attackRange = 0.3;
     	let aggrorange  = 2.5;
         let isFlying     = 0;
         
         let speed        = 5;
         let maxhp:number = 67;
-        let hp:number    = 67;
-
-        let attackSpeed  = 1;
+        
+        let attackSpeed  = 30;
         let damage:number = 67;
+
+        let healthbar_y  = 3;
+        let projectile_user = 0;
 
 
     	// Box2d's collision grouping
@@ -378,24 +461,37 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.skeleton;
-    		maxhp       = 99;
+    		maxhp       = 120;
             damage      = 67;
+            attackSpeed = 20;
+            speed       = 5;
+
 
     	
     	} else if ( type == "giant" ) {
 
-    		y 			= 1.75;
-    		modelsize 	= 0.17;
-    		b2dsize  	= 0.28;
+    		y 			= 1.85;
+    		modelsize 	= 0.20;
+    		b2dsize  	= 0.25;
     		model 		= resources.models.giant;
-    	
+    	    maxhp       = 1200;
+            damage      = 267;
+            attackSpeed = 80;
+            speed       = 5;
+            healthbar_y = 5;
+            
     	
     	} else if ( type == "knight" ) {
 
-    		y 			= 1.65;
-    		modelsize 	= 0.15;
+    		y 			= 1.71;
+    		modelsize 	= 0.18
     		b2dsize  	= 0.15;
     		model 		= resources.models.knight;
+            maxhp       = 600;
+            damage      = 124;
+            attackSpeed = 40;
+            speed       = 5;
+
     	
     	} else if ( type == "archer" ) {
 
@@ -403,6 +499,12 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.archer;
+            maxhp       = 450;
+            damage      = 60;
+            attackSpeed = 20;
+            attackRange = 3.2;
+            projectile_user = 1;
+
     	
     	} else if ( type == "wizard" ) {
 
@@ -410,7 +512,13 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.wizard;
-    	
+    	    maxhp       = 600;
+            damage      = 124;
+            attackSpeed = 40;
+            speed       = 5;
+            attackRange = 3.5;
+            projectile_user = 1;
+            
     	
     	} else if ( type == "goblin" ) {
     		y 			= 1.6;
@@ -420,6 +528,8 @@ export class Txstage extends Entity {
     		speed 		= 5.0;
     		maxhp       = 167;
     	    damage      = 99;
+            attackSpeed = 20;
+
 
     	} else if ( type == "devil" ) {
     		
@@ -428,7 +538,11 @@ export class Txstage extends Entity {
     		b2dsize  	= 0.25;
     		model 		= resources.models.devil;
     		isFlying    = 1;
-
+            maxhp       = 600;
+            damage      = 124;
+            attackSpeed = 40;
+            speed       = 5;
+            
 
     	} else if ( type == "devilhorde" ) {
     		y 			= 2.7;
@@ -436,11 +550,18 @@ export class Txstage extends Entity {
     		b2dsize  	= 0.15;
     		model 		= resources.models.devil;
     		isFlying    = 1;
+            maxhp       = 600;
+            damage      = 124;
+            attackSpeed = 40;
+            speed       = 5;
+            
     	} 
 
         let unit:Txunit;
-        let recyclable_index = this.getRecyclableUnit();
+        let recyclable_index = this.getRecyclableUnit( type );
+
         if ( recyclable_index == -1 ) {
+
 
 
             unit = new Txunit(
@@ -458,8 +579,11 @@ export class Txstage extends Entity {
     	  			"dynamic",
     	  			this.playerindex,
     	  			isFlying,
-    	  			aggrorange
+    	  			aggrorange,
+                    healthbar_y
     	  		);
+            this.units.push( unit );
+
         } else {
 
             unit = this.units[recyclable_index];
@@ -479,17 +603,17 @@ export class Txstage extends Entity {
             unit.removeComponent( GLTFShape );
             unit.addComponent( model );
             unit.reinit();
-            
+
         }	
 
         
-        unit.hp          = maxhp;
+        unit.curhp       = maxhp;
         unit.maxhp       = maxhp;
     	unit.attackRange = attackRange;
     	unit.speed 		 = speed;
         unit.attackSpeed = attackSpeed;
         unit.damage      = damage;
-
+        unit.projectile_user = projectile_user;
 
 
     	if ( unit.isFlying == 1 ) {
@@ -499,7 +623,7 @@ export class Txstage extends Entity {
     	unit.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
 		unit.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
 
-		this.units.push( unit );
+		
     	return unit;
     }
 
@@ -651,14 +775,14 @@ export class Txstage extends Entity {
 		
         let fixDef          = new b2FixtureDef();
         fixDef.density      = 20;
-        fixDef.friction     = 1;
-        fixDef.restitution  = 0.5;
+        fixDef.friction     = 100;
+        fixDef.restitution  = 0.3;
         fixDef.shape        = new b2CircleShape(radius);
         
         let b2body = world.CreateBody(bodyDef);
         b2body.CreateFixture(fixDef);
-        b2body.SetLinearDamping(0.1);
-		b2body.SetAngularDamping(0.1);
+        b2body.SetLinearDamping(1);
+		b2body.SetAngularDamping(1);
 
 
         return b2body;

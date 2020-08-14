@@ -25,13 +25,12 @@ export class Txunit extends Entity {
 	public type;
 
 
-	public clips = {};
 	public walking_queue = [];
 	public speed = 10;
 	public owner;
 	
 	public attackRange;
-	public attackSpeed = 1;
+	public attackSpeed = 30;
 	
 	public aggroRange = 1.5;
 	public isFlying = 0;
@@ -41,7 +40,7 @@ export class Txunit extends Entity {
 	public movetarget:Txunit = null;
 
 
-	public hp:number;
+	public curhp:number;
 	public maxhp:number;
 
 	public damage:number;
@@ -50,9 +49,16 @@ export class Txunit extends Entity {
 	public dead = 0;
 	public tick;
 
-	public animator;
+	public clips = {};
+	public projectile;
 
-	constructor( id, parent , transform_args, box2d_transform_args,  shape , type, shapetype , owner, isFlying, aggroRange ) {
+	public skin_radius;
+	public tower_archer;
+
+	public projectile_user = 0;
+
+
+	constructor( id, parent , transform_args, box2d_transform_args,  model , type, shapetype , owner, isFlying, aggroRange , healthbar_y ) {
 
 		super();
 		engine.addEntity(this);
@@ -66,46 +72,65 @@ export class Txunit extends Entity {
 		this.isFlying = isFlying ;
 		this.aggroRange = aggroRange;
 		this.type = type;
-		this.visible_ypos = this.transform.position.y;
 		this.shapetype = shapetype;
 
-		
 		this.reinstate_box2d( box2d_transform_args );
-
 		this.addComponent( this.transform );
-		this.addComponent( shape );
+		this.addComponent( model );
 		
-
-		this.animator = new Animator();
-		this.addComponent( this.animator );
 	
 
-
-
         let healthbar_material = new Material();
-
-        if ( this.owner == 1 ) {
-        	healthbar_material.albedoColor = Color3.FromInts( 255, 0, 0 );
-	    } else {
-	    	healthbar_material.albedoColor = Color3.FromInts( 0, 0, 200 );
-	    }
         healthbar_material.specularIntensity = 0;
         healthbar_material.roughness = 1.0;
-
-
-
-		
-		let healthbar = new Entity();
-		healthbar.setParent( this );
+        let healthbar = new Entity();
+        healthbar.setParent( this );
 		healthbar.addComponent( new PlaneShape() );
 		healthbar.addComponent( new Transform({
-			position: new Vector3(  0,     3,   0),
+			position: new Vector3(  0,    healthbar_y,   0),
 			scale   : new Vector3(1.5,   0.2,   1)
 		}));
 		healthbar.addComponent( new Billboard() );
 		healthbar.addComponent( healthbar_material );
 
 		this.healthbar = healthbar;
+
+		
+		
+		this.skin_radius = box2d_transform_args.scale.x;
+		this.addComponent( new Animator );
+
+		if ( this.type == "tower" ) {
+
+			let tower_archer = new Entity();
+			tower_archer.setParent(this);
+			tower_archer.addComponent( resources.models.archer );
+			tower_archer.addComponent( new Animator );
+
+			let tax = 0.1;
+			let tay = 0.35;
+			let taz = 0.5;
+
+			if ( this.owner == -1 ) {
+				taz = -0.5;
+				tax = -0.1;
+			}
+
+			tower_archer.addComponent( new Transform( {
+				position: new Vector3( tax, tay , taz),
+				scale   : new Vector3( 0.15, 0.15, 0.15 )
+			}));
+			
+			this.tower_archer = tower_archer;
+			
+			if ( this.owner == -1 ) {
+				this.tower_archer.getComponent(Transform).rotation.eulerAngles = new Vector3( 0 , 180 , 0 );
+			}
+		}
+
+		
+		this.createAnimationStates();
+
 		this.reinit();
 
 
@@ -116,23 +141,51 @@ export class Txunit extends Entity {
 
 		this.updatePosition_toBox2d();
 		
+		 if ( this.owner == 1 ) {
+        	this.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 255, 0, 0 );
+	    } else {
+	    	this.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 0, 0, 200 );
+	    }
+		this.attacktarget = null ;
+		this.movetarget   = null ;
+		this.attacking    = 0;
+		this.tick  		  = 0;
+		this.visible_ypos = this.transform.position.y;
+		//this.getComponent(GLTFShape).visible = true;
 
-		
-		log( "Unit " , this.type, this.id , " reinited");
+		log( "Unit " , this.type, this.id , " reinited. arr len", this.parent.units.length );
 		
 
 	}
+
+	//-------------------
+    createAnimationStates() {
+        
+        if ( this.type == "tower" ) {
+        	this.getComponent(Animator).addClip( new AnimationState("ArmatureAction") );
+			this.getComponent(Animator).getClip("ArmatureAction").playing = true;
+			this.tower_archer.getComponent(Animator).addClip( new AnimationState("Punch") );
+			
+        } else {
+        	this.getComponent(Animator).addClip( new AnimationState("_idle") );
+			this.getComponent(Animator).addClip( new AnimationState("Walking") );
+			this.getComponent(Animator).addClip( new AnimationState("Punch") );
+			this.getComponent(Animator).addClip( new AnimationState("Die") );
+   		
+   		}
+    }
+
 
 	//------------------
 	reinstate_box2d( box2d_transform_args ) {
 
 		if ( this.shapetype == "static" ) {
-			this.box2dbody = this.parent.createStaticBox(  
+			this.box2dbody = this.parent.createStaticCircle(  
 	    				this.transform.position.x ,  
 	    				this.transform.position.z ,  
 	    				box2d_transform_args.scale.x , 
-	    				box2d_transform_args.scale.z, 
-	    				this.parent.world 
+	    				this.parent.world,
+	    				false 
 	    	);
 
 
@@ -142,7 +195,7 @@ export class Txunit extends Entity {
 	    				this.transform.position.z ,  
 	    				box2d_transform_args.scale.x , 
 	    				this.parent.world, 
-	    				true 
+	    				false 
 	    	);
 
 	    }
@@ -172,14 +225,29 @@ export class Txunit extends Entity {
 				}
 			} 
 		} else {
-			// Dead ones, move to below 
-			if ( this.dead == 1 ) {
-				if ( this.transform.position.y > this.visible_ypos - 0.05 ) {
-					this.transform.position.y -= 0.001;
-				} else {
-					this.dead = 2;
-					log( this.id , "'s dead turns" , 2 );
-				}
+			this.die_and_rot();
+		}
+	}
+
+
+	//----------------
+	die_and_rot() {
+		// Dead ones, move to below 
+		if ( this.dead == 1 ) {
+
+			let dst       		=  this.transform.scale.y * -1;
+			let start_remaining =  this.visible_ypos - dst;
+			let remaining 		=  this.transform.position.y - dst;
+
+			if ( remaining > 0 ) {
+				this.transform.position.y -=  start_remaining / 100;
+			} else {
+				
+				this.dead = 2;
+				this.stopAllClips();
+				//this.getComponent(GLTFShape).visible = false;
+
+				log( this.id , "'s dead turns" , 2 );
 			}
 		}
 	}
@@ -199,8 +267,7 @@ export class Txunit extends Entity {
 
 	    	if ( hyp > this.speed * this.speed * dt * dt  ) {
 	    		
-	    		this.playAnimation("walk", 1);
-
+	    		
 	    		var rad	 = Math.atan2( diff_x, diff_z );
 	    		var deg  = rad * 180.0 / Math.PI ;
 	    		var delta_x = this.speed * dt * Math.sin(rad);
@@ -209,10 +276,13 @@ export class Txunit extends Entity {
 	    		this.box2dbody.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
 
 	    		this.transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+
 	    	
 	    	} else {
 	    		this.walking_queue.shift();
-	    		this.stopAnimation("walk");
+	    		if ( this.walking_queue.length == 0 ) {
+	    			this.stopAnimation("Walking");
+	    		}
 	    	}
 	    	
 
@@ -222,7 +292,7 @@ export class Txunit extends Entity {
 		
 	//---
 	die() {
-		this.playAnimation("die", 0 );
+		this.playAnimation("Die", 0 );
 		this.dead = 1;
 		this.parent.world.DestroyBody( this.box2dbody );
 	}
@@ -231,11 +301,7 @@ export class Txunit extends Entity {
 	attack_target() {
 
 
-		// Disable buidlign attack first
-		if ( this.shapetype == "static" ) {
-			return ;
-		}
-
+		
 
 		// Has attack target.
 		if ( this.attacktarget != null  ) {
@@ -248,13 +314,8 @@ export class Txunit extends Entity {
 				let diff_z =  this.attacktarget.transform.position.z - this.transform.position.z;
 				let hyp    =  diff_x * diff_x + diff_z * diff_z ;
 				
-				let use_attackRange = this.attackRange;
-				if ( this.attacktarget.transform.scale.x * 2 / 3 > use_attackRange ) {
-					use_attackRange = this.attacktarget.transform.scale.x * 2/3 ;
-				}
-				if ( this.attacktarget.transform.scale.z * 2 / 3  > use_attackRange ) {
-					use_attackRange = this.attacktarget.transform.scale.z * 2/3 ;
-				}
+				let use_attackRange = this.attackRange + this.attacktarget.skin_radius ;
+									
 
 				if ( hyp >  use_attackRange * use_attackRange ) {
 					// attack target not in range. need not to do anything.
@@ -267,43 +328,78 @@ export class Txunit extends Entity {
 				} else { 
 
 					if ( this.attacking == 0 ) {
-					
+						
 						// Attack target is in attack range, attack now.
 						this.walking_queue.length = 0;
 						this.box2dbody.SetLinearVelocity( new b2Vec2(0,0) );
 						this.attacking = 1;
-						this.tick = 30;
-						this.playAnimation("attack", 1 );
+						this.tick = this.attackSpeed;
+
+						if ( this.projectile_user == 0 ) {
+							this.playAnimation("Punch", 1 );
+						}
+						
+						var rad	 = Math.atan2( diff_x, diff_z );
+	    				var deg  = rad * 180.0 / Math.PI ;
+	    						
+						if ( this.type != "tower" ) {
+							
+							this.transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+						
+						} else if ( this.type == "tower" ) {
+							
+							let tower_archer_transform = this.tower_archer.getComponent(Transform);
+							tower_archer_transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+
+						}
 						
 					}
 
 					if ( this.tick <= 0 ) {
 
-						
-						this.attacktarget.hp -= this.damage;
-						if ( this.attacktarget.hp < 0 ) {
-							this.attacktarget.hp = 0;
+						// Projectile shooter
+						if ( this.projectile_user == 1 ) {
+
+							if ( this.projectile == null || this.projectile.visible == 0 ) {
+								
+								this.playAnimation("Punch", 0 );
+
+								let srcx, srcy, srcz;
+
+								if ( this.type == "tower" ) {
+
+
+									srcx = this.transform.position.x + this.tower_archer.getComponent(Transform).position.x;
+									srcy = this.transform.position.y + this.tower_archer.getComponent(Transform).position.y + 0.14;
+									srcz = this.transform.position.z + this.tower_archer.getComponent(Transform).position.z;
+								
+								} else  {
+
+									srcx = this.transform.position.x;
+									srcy = this.transform.position.y + 0.14;
+									srcz = this.transform.position.z;
+								}
+
+								let dstx = this.attacktarget.transform.position.x;
+								let dsty = this.attacktarget.transform.position.y;
+								let dstz = this.attacktarget.transform.position.z;
+
+								let projectile_type = 1;
+								if ( this.type == "wizard" ) {
+									projectile_type = 2;
+								}
+
+								this.projectile = this.parent.createProjectile( srcx, srcy, srcz, dstx, dsty, dstz , this, projectile_type );
+							
+							}
+
+
+
+						} else {
+							// Melee
+							this.inflict_damage();
 						}
-						//log( this.id , "hits " , this.attacktarget.id , " remaining hp = " , this.attacktarget.hp )
-
-						let hp_perc = this.attacktarget.hp / this.attacktarget.maxhp ;
-						this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
-						if ( this.attacktarget.hp <= 0 ) {
-							
-
-							log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );
-							
-							
-							this.attacktarget.die();
-							this.attacktarget = null;
-							this.movetarget   = null;
-
-							this.attacking = 0;
-
-
-
-						}
-						this.tick = 60;
+						this.tick = this.attackSpeed;
 
 					} else {
 						this.tick -= 1;
@@ -316,6 +412,7 @@ export class Txunit extends Entity {
 				this.attacktarget = null;
 				this.movetarget = null;
 				this.attacking = 0;
+				this.projectile = null;
 			}
 		} else {
 			this.attacking = 0;
@@ -323,6 +420,36 @@ export class Txunit extends Entity {
 
 	}
 
+
+	//---
+	inflict_damage() {
+
+		if ( this.attacktarget != null ) {
+			
+			this.attacktarget.curhp -= this.damage;
+			if ( this.attacktarget.curhp < 0 ) {
+				this.attacktarget.curhp = 0;
+			}
+			//log( this.type, this.id , "hits " , this.attacktarget.type, this.attacktarget.id , " remaining hp = " , this.attacktarget.curhp , this.attacktarget.maxhp )
+
+			let hp_perc = this.attacktarget.curhp / this.attacktarget.maxhp ;
+			this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
+			if ( this.attacktarget.curhp <= 0 ) {
+				
+
+				//log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );
+				this.attacktarget.projectile = null;
+				this.attacktarget.die();
+				this.attacktarget = null;
+				
+
+				this.movetarget   = null;
+				this.attacking = 0;
+
+
+			}
+		}
+	}
 	
 
 	//----
@@ -331,26 +458,32 @@ export class Txunit extends Entity {
 		if ( this.attacktarget == null ) {
 			// No attack target ? look for one within aggro range. 
 			let i;
+			let nearest_u = null;
+			let nearest_hypsqr = 999;
+				
 			for ( i = 0 ; i < this.parent.units.length ; i++ ) {
 
 				let u = this.parent.units[i];
 
 				if ( u != null && u.owner != this.owner && u.dead == 0 ) {
+
 					let diff_x =  u.transform.position.x - this.transform.position.x;
 					let diff_z =  u.transform.position.z - this.transform.position.z;
 					let hypsqr    =  diff_x * diff_x + diff_z * diff_z ;
 
 					if ( hypsqr <=  this.aggroRange * this.aggroRange ) {
 
-						this.attacktarget = u;
-						this.movetarget   = this.attacktarget;
-						this.find_path_to_target();
-
-						log( this.type, this.id , " attacktarget to " , this.attacktarget.type, this.attacktarget.id  );
-
-						break;
+						if ( hypsqr < nearest_hypsqr ) {
+							nearest_u = u;
+							nearest_hypsqr = hypsqr;
+						}
 					}
 				}
+			}
+			if ( nearest_u != null ) {
+				this.attacktarget = nearest_u;
+				this.movetarget   = this.attacktarget;
+				this.find_path_to_target();
 			}
 
 		} else {
@@ -374,7 +507,7 @@ export class Txunit extends Entity {
 			
 			if ( this.transform.position.x < 0 ) {
 				
-				if ( this.parent.units[0].visible == 1 ) {
+				if ( this.parent.units[0].dead == 0 ) {
 					this.movetarget = this.parent.units[0 + side_index ];
 				} else {
 					this.movetarget = this.parent.units[2 + side_index];
@@ -382,14 +515,14 @@ export class Txunit extends Entity {
 
 			} else {
 
-				if ( this.parent.units[0].visible == 1 ) {
+				if ( this.parent.units[0].dead == 0 ) {
 					this.movetarget = this.parent.units[1 + side_index];
 				} else {
 					this.movetarget = this.parent.units[2 + side_index];
 				}	
 			}
 
-			log( this.type, this.id , " movetarget to " , this.movetarget.type, this.movetarget.id  );
+			//log( this.type, this.id , " movetarget to " , this.movetarget.type, this.movetarget.id  );
 			this.find_path_to_target();
 				
 		
@@ -483,6 +616,7 @@ export class Txunit extends Entity {
     	this.walking_queue.push( target );
 
 
+    	this.playAnimation("Walking", 1);
 
 
 
@@ -500,14 +634,68 @@ export class Txunit extends Entity {
     }
 
 
+
+
+
+
+    
+    public clip_names = ["_idle", "Walking", "Die", "Punch"];
+
+
+    //------------
     playAnimation( action_name, loop ) {
 
+    	let i;
+		for ( i = 0 ; i < this.clip_names.length ; i++ ) {
+			if ( this.clip_names[i] != action_name ) {
+				this.stopAnimation( this.clip_names[i]);
+			}
+		}
+
+
+		//log( this.type , this.id , "Attempt to play" , action_name , loop );
+		let clip;
+		if ( action_name == "Punch" && this.type == "tower" ) {
+			clip = this.tower_archer.getComponent(Animator).getClip( action_name );
+		} else {
+			clip = this.getComponent(Animator).getClip(action_name);
+    	}
+    	
+    				
+		if ( loop == 1  ) {
+    		clip.looping = true;
+    	} else {
+    		clip.looping = false;
+    	}
+    	if ( action_name == "Punch" ) {
+    		clip.speed = 30.0 / this.attackSpeed ;
+    	} else {
+    		clip.speed = 1.0;
+    	}
+    	clip.reset()
+    	clip.play();
+	
+		
     }
 
     stopAnimation( action_name ) {
+    	
+    	//log( this.type , this.id , "Attempt to stop" , action_name );
+
+    	let clip = this.getComponent(Animator).getClip(action_name);
+    	clip.stop();
 
     }
 	
+    //--
+	stopAllClips() {
+		
+		let i;
+		for ( i = 0 ; i < this.clip_names.length ; i++ ) {
+			this.stopAnimation( this.clip_names[i]);
+		}
+	}
+
 
      //---
     hide() {
