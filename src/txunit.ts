@@ -36,6 +36,7 @@ export class Txunit extends Entity {
 	
 	public aggroRange = 1.5;
 	public isFlying = 0;
+	public attack_building_only = 0;
 
 	public attacking = 0;
 	public attacktarget:Txunit = null;
@@ -160,14 +161,6 @@ export class Txunit extends Entity {
 		
 
 
-		this.reinit();
-
-
-	}
-
-	//------------
-	reinit() {
-
 		this.updatePosition_toBox2d();
 		
 		 if ( this.owner == 1 ) {
@@ -182,10 +175,11 @@ export class Txunit extends Entity {
 		this.visible_ypos = this.transform.position.y;
 		//this.getComponent(GLTFShape).visible = true;
 
-		log( "Unit " , this.type, this.id , " reinited. arr len", this.parent.units.length );
 		
-
 	}
+
+
+
 
 	//-------------------
     createAnimationStates() {
@@ -210,19 +204,29 @@ export class Txunit extends Entity {
 	//------------------
 	update( dt ) {
 
-		if ( this.dead == 0 ) {
+		if ( this.visible == 1 ) {
+			if ( this.dead == 0 ) {
 
-			this.find_attack_target();
-			this.attack_target();
-			
-			if ( this.attacking == 0 ) {
-				this.find_move_target();
-				if ( this.shapetype == "dynamic" ) {
-					this.move_self( dt );
+				this.find_attack_target();
+				this.attack_target();
+				
+				if ( this.attacking == 0 ) {
+					this.find_move_target();
+					if ( this.shapetype == "dynamic" ) {
+						this.move_self( dt );
+					}
 				}
-			} 
+				this.updatePosition_toBox2d();
+ 
+			} else {
+				this.die_and_rot();
+			}
+
 		} else {
-			this.die_and_rot();
+			this.tick += 1;
+			if ( this.tick > 100 ) {
+				this.parent.removeUnit( this );
+			}
 		}
 	}
 
@@ -243,8 +247,8 @@ export class Txunit extends Entity {
 				this.dead = 2;
 				this.stopAllClips();
 				//this.getComponent(GLTFShape).visible = false;
+				this.hide();
 
-				log( this.id , "'s dead turns" , 2 );
 			}
 		}
 	}
@@ -297,9 +301,6 @@ export class Txunit extends Entity {
 	//----
 	attack_target() {
 
-
-		
-
 		// Has attack target.
 		if ( this.attacktarget != null  ) {
 
@@ -336,19 +337,7 @@ export class Txunit extends Entity {
 							this.playAnimation("Punch", 1 );
 						}
 						
-						var rad	 = Math.atan2( diff_x, diff_z );
-	    				var deg  = rad * 180.0 / Math.PI ;
-	    						
-						if ( this.type != "tower" ) {
-							
-							this.transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
-						
-						} else if ( this.type == "tower" ) {
-							
-							let tower_archer_transform = this.tower_archer.getComponent(Transform);
-							tower_archer_transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
-
-						}
+						this.lookat_target( diff_x , diff_z );
 						
 					}
 
@@ -395,6 +384,9 @@ export class Txunit extends Entity {
 							);
 							
 
+							this.lookat_target( diff_x , diff_z );
+							
+
 						} else {
 							// Melee
 							this.inflict_damage();
@@ -419,6 +411,19 @@ export class Txunit extends Entity {
 
 	}
 
+	//---
+	lookat_target( diff_x , diff_z ) {
+
+		var rad	 = Math.atan2( diff_x, diff_z );
+		var deg  = rad * 180.0 / Math.PI ;
+				
+		if ( this.type != "tower" ) {
+			this.transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+		} else if ( this.type == "tower" ) {
+			let tower_archer_transform = this.tower_archer.getComponent(Transform);
+			tower_archer_transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+		}
+	}	
 
 	//---
 	inflict_damage() {
@@ -510,7 +515,7 @@ export class Txunit extends Entity {
 
 				let u = this.units_in_proximity[i];
 
-				if ( u != null && u.owner != this.owner && u.dead == 0 ) {
+				if ( u != null && u.owner != this.owner && u.dead == 0 && !(this.isFlying == 0 && u.isFlying == 1) && !( this.attack_building_only == 1 && this.shapetype == "dynamic") ) {
 
 					let diff_x =  u.transform.position.x - this.transform.position.x;
 					let diff_z =  u.transform.position.z - this.transform.position.z;
@@ -727,7 +732,7 @@ export class Txunit extends Entity {
 
     	let clip = this.getComponent(Animator).getClip(action_name);
     	clip.stop();
-
+    	clip.reset();
     }
 	
     //--
@@ -744,14 +749,8 @@ export class Txunit extends Entity {
     hide() {
     	this.transform.position.y = -999;
     	this.visible = 0;
-    	this.box2dbody.SetLinearVelocity( new b2Vec2(0,0) );
-    	this.box2dbody.SetAngularVelocity( 0.0 );
+    	this.tick = 0;
     	
     }
-    //----
-    show( ) {
-    	this.transform.position.y = this.visible_ypos;
-    	this.visible = 1;
-
-    }
+    
 }

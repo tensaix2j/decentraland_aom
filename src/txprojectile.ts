@@ -15,13 +15,14 @@ export class Txprojectile extends Entity {
 	public src_v3;
 
 	public visible = 1;
-	public speed = 0.3;
+	public speed = 2.5;
 
 	public attacktarget;
 	public damage;
 	public owner;
-	
+
 	public type;
+	public tick = 0;
 
 	constructor( id, parent , src_v3, dst_v3 , shape , attacktarget ,type , damage , owner ) {
 
@@ -46,47 +47,26 @@ export class Txprojectile extends Entity {
 		this.addComponent( transform );
 		this.addComponent( shape );
 		
-		this.reinit();
-	}
-
-
-	//--------------
-	reinit() {
-
-		//log( "Projectile" , this.id , "reinited" , this.getComponent(Transform).position.y , this.speed ) ;
 	}
 
 
 	//--------------
 	move_self( dt ) {
 		
+		
+
 		let transform = this.getComponent(Transform);
+		let distance = Vector3.DistanceSquared(transform.position, this.dst_v3 ) // Check distance squared as it's more optimized
 
-		let diff_x = this.dst_v3.x -  transform.position.x;
-		let diff_z = this.dst_v3.z -  transform.position.z;
+    	if (distance > this.speed * this.speed * dt * dt ) {
 
-    	var hypsqr = diff_x * diff_x + diff_z * diff_z  ;
+    		let direction = this.dst_v3.subtract(transform.position)
+		    transform.rotation = Quaternion.LookRotation(direction)
 
-    	if ( hypsqr > this.speed * this.speed   ) {
-    		
-    			var rad	 = Math.atan2( diff_x, diff_z );
-	    		var deg  = rad * 180.0 / Math.PI ;
+    		let forwardVector = Vector3.Forward().rotate(transform.rotation)
+      		let increment = forwardVector.scale(dt * this.speed );
+      		transform.translate(increment)
 
-	    		var delta_x = this.speed * Math.sin(rad);
-	    		var delta_z = this.speed * Math.cos(rad);
-
-	    		transform.position.x += delta_x;
-	    		transform.position.z += delta_z;
-	    		
-
-	    		// extra
-	    		let diff_y = this.dst_v3.y -  transform.position.y;
-    			var rad2 = Math.atan2( diff_y, diff_z );
-	    		var delta_y = this.speed * Math.sin(rad2);
-	    		var deg2    = rad2 * 180.0 / Math.PI;
-	    		transform.position.y += delta_y;
-	    		
-	    		transform.lookAt( this.dst_v3 );
 
 	    } else {
 
@@ -107,6 +87,7 @@ export class Txprojectile extends Entity {
 
 	    	this.owner = null;
 	    	this.hide();
+
 	    }
 	}
 
@@ -137,22 +118,23 @@ export class Txprojectile extends Entity {
 
 	//----------
 	update(dt) {
-
-		this.move_self(dt);
+		if ( this.visible == 1 ) {
+			this.move_self(dt);
+		} else {
+			this.tick += 1;
+			if ( this.tick > 100 ) {
+				this.parent.removeProjectile( this );
+			}
+		}
 	}
 
-	//-----
+
+	//----
 	hide() {
 		this.visible = 0;
-		this.getComponent(Transform).position.y = 999;
-		//this.getComponent(GLTFShape).visible = false;
+		this.tick = 0;
+		this.getComponent(Transform).position.y = -999;
 
-	}
-
-	//---
-	show() {
-		this.visible = 1;
-		//this.getComponent(GLTFShape).visible = true;
 	}
 }
 

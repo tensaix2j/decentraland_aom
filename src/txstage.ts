@@ -275,17 +275,13 @@ export class Txstage extends Entity {
     //-------------
     debug( ) {
 
-        this.card_input_down( null, this.txcards[4] );
-
-        this.playerindex = -1;
-        this.createUnit( "goblin" , -3, 0 );
-        this.createUnit( "goblin" , -2.9, 0 );
-         
-        this.playerindex = 1;
-
-
+        this.card_input_down( null, this.txcards[3] );
 
         //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
+
+        this.playerindex = -1;
+        this.createUnit( "goblin", 0,0 );
+        this.playerindex = 1;
 
 
 
@@ -310,16 +306,15 @@ export class Txstage extends Entity {
         let u;
         for ( u = 0 ; u < this.units.length ; u++) {
             let unit = this.units[u];
-            if ( unit.visible == 1 && unit.dead < 2 ) {
+            if ( unit != null  ) {
                 unit.update(dt);
-                unit.updatePosition_toBox2d();
             } 
         }
 
         let p;
         for ( p = 0 ; p < this.projectiles.length ; p++ ) {
             let projectile = this.projectiles[p];
-            if ( projectile.visible == 1 ) {
+            if ( projectile != null  ) {
                 projectile.update(dt);
             }
         }
@@ -327,7 +322,7 @@ export class Txstage extends Entity {
         let exp;
         for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
             let explosion = this.explosions[exp];
-            if ( explosion.visible == 1  ) {
+            if ( explosion != null && explosion.visible == 1  ) {
                 explosion.update(dt);
             }
         }
@@ -361,11 +356,11 @@ export class Txstage extends Entity {
         	// E button
         	this.playerindex = 1;
 
-
         } else if ( e.buttonId == 2 ) {
         	// F button 	
-        	this.playerindex = -1;
-
+        	
+            this.playerindex = -1;
+            
 
         }	
      }
@@ -402,13 +397,49 @@ export class Txstage extends Entity {
 
 
 
-     //------------
+
+
+
+
+
+    //------------------
+    removeExplosion( ex ) {
+
+        engine.removeEntity( this.explosions[ ex.id ] );
+        this.explosions[ ex.id ] = null;
+
+        let i;
+        for ( i =  this.explosions.length - 1 ; i >= 0 ; i-- ) {
+            // Shorten array if possible
+            if ( this.explosions[i] == null ) {
+                this.explosions.length = i;
+            } else {
+                break;
+            }
+        }
+    }
+
+
+
+    //------------
+    getRecyclableExplosionIndex( ) {
+
+        let i;
+        for ( i = 0 ; i < this.explosions.length ; i++ ) {
+            if ( this.explosions[i] == null ) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+    //------------
     getRecyclableExplosion( ) {
 
         let i;
         for ( i = 0 ; i < this.explosions.length ; i++ ) {
-            let explosion = this.explosions[i];
-            if ( explosion.visible == 0  ) {
+            if ( this.explosions[i] != null  && this.explosions[i].visible == 0 ) {
                 return i;
             }
         }
@@ -417,16 +448,26 @@ export class Txstage extends Entity {
 
 
 
-
     //---------
     createExplosion( location_v3 , damage , owner ) {
 
         let explosion:Txexplosion;
         let recyclable_index = this.getRecyclableExplosion( );
-        
-        if ( recyclable_index == -1 ) {
 
-            let explosion = new Txexplosion(
+
+        if ( recyclable_index >= 0 ) {
+
+            // Reuse entity
+            explosion = this.explosions[recyclable_index];
+            explosion.getComponent(Transform).position = location_v3;
+            explosion.damage = damage;
+            explosion.owner  = owner;
+            explosion.visible = 1;
+            explosion.tick = 0;
+
+        } else {
+        
+            explosion = new Txexplosion(
                 this.explosions.length,
                 this,
                 {
@@ -436,36 +477,85 @@ export class Txstage extends Entity {
                 damage,
                 owner
             ) ;
-            this.explosions.push( explosion );
+            
+            recyclable_index = this.getRecyclableExplosionIndex();
 
-        } else {
-    
-             //log( srcx, srcy, srcz, dstx, dsty, dstz );
-            explosion = this.explosions[recyclable_index];
-            explosion.getComponent(Transform).position = location_v3;
-            explosion.damage = damage;
-            explosion.owner  = owner;
-            explosion.reinit();
-            explosion.show();
+            if ( recyclable_index == -1 ) {
+                this.explosions.push( explosion );
 
+            } else {
+                // Reuse index.
+                explosion.id = recyclable_index;
+                this.explosions[recyclable_index] = explosion;
+            }
         }
-       
+
+       // log( "Explosion " , explosion.id , " inited. arr len", this.explosions.length );
+            
         return explosion;
     }
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //------------------
+    removeProjectile( p ) {
+
+        engine.removeEntity( this.projectiles[ p.id ] );
+        this.projectiles[ p.id ] = null;
+
+        let i;
+        for ( i =  this.projectiles.length - 1 ; i >= 0 ; i-- ) {
+            // Shorten array if possible
+            if ( this.projectiles[i] == null ) {
+                this.projectiles.length = i;
+            } else {
+                break;
+            }
+        }
+    }
+
+
+
+
+
      //------------
-    getRecyclableProjectile( type ) {
+    getRecyclableProjectileIndex() {
 
         let i;
         for ( i = 0 ; i < this.projectiles.length ; i++ ) {
-            let projectile = this.projectiles[i];
-            if ( projectile.visible == 0 && projectile.type == type ) {
+            if ( this.projectiles[i] == null ) {
                 return i;
             }
         }
         return -1;
+    
+    }
+
+    //--------
+    getRecyclableProjectile( type ) {
+
+        let i;
+        for ( i = 0 ; i < this.projectiles.length ; i++ ) {
+            if ( this.projectiles[i] != null  && this.projectiles[i].type == type && this.projectiles[i].visible == 0 ) {
+                return i;
+            }
+        }
+        return -1;
+    
     }
 
 
@@ -475,46 +565,25 @@ export class Txstage extends Entity {
 
 
         let projectile:Txprojectile;
-        let recyclable_index = this.getRecyclableProjectile( projectile_type );
-
-
-        if ( recyclable_index == -1 ) {
-            
-            let shape;
-            if ( projectile_type == 1 ) {
-                
-                shape = resources.models.arrow;
-
-            } else if ( projectile_type == 2  ) {
-
-
-                shape = this.shared_fireball_shape;
-                
-            }
-
-            projectile = new Txprojectile(
-                        this.projectiles.length,
-                        this,
-                        src_v3, 
-                        dst_v3,
-                        shape,
-                        attacktarget,
-                        projectile_type,
-                        damage,
-                        owner
-                    );
-
-            if ( projectile_type == 2 ) {
-                projectile.getComponent( Transform ).scale.x = 0.5;
-                projectile.getComponent( Transform ).scale.y = 0.5;
-                projectile.addComponent( this.shared_fireball_material );
-                projectile.addComponent( new Billboard() );
-            }
-            this.projectiles.push( projectile );
         
-        } else {
+        let shape;
+        if ( projectile_type == 1 ) {
+            
+            shape = resources.models.arrow;
 
-            //log( srcx, srcy, srcz, dstx, dsty, dstz );
+        } else if ( projectile_type == 2  ) {
+
+
+            shape = this.shared_fireball_shape;
+            
+        }
+
+
+        let recyclable_index = this.getRecyclableProjectile( projectile_type );
+        
+        if ( recyclable_index >= 0 ) {
+
+            // Reuse entity
             projectile = this.projectiles[recyclable_index];
             projectile.getComponent(Transform).position = src_v3;
             projectile.src_v3                           = src_v3;
@@ -523,37 +592,78 @@ export class Txstage extends Entity {
             projectile_type = projectile_type;
             projectile.damage = damage;
             projectile.owner  = owner;
-            projectile.reinit();
-            projectile.show();
+            projectile.tick   = 0;
+            projectile.visible = 1;
 
+            //log("Reusing projectile" , "type", projectile.type, "id" , projectile.id , "arrlen", this.projectiles.length );
+
+        } else {
+
+            projectile = new Txprojectile(
+                this.projectiles.length,
+                this,
+                src_v3, 
+                dst_v3,
+                shape,
+                attacktarget,
+                projectile_type,
+                damage,
+                owner
+            );
+
+            if ( projectile_type == 2 ) {
+                projectile.getComponent( Transform ).scale.x = 0.5;
+                projectile.getComponent( Transform ).scale.y = 0.5;
+                projectile.addComponent( this.shared_fireball_material );
+                projectile.addComponent( new Billboard() );
+            }
+
+            recyclable_index = this.getRecyclableProjectileIndex();
+            if ( recyclable_index == -1 ) {    
+                this.projectiles.push( projectile );
+            
+            } else {
+                // Reuse index
+                projectile.id = recyclable_index;
+                this.projectiles[recyclable_index] = projectile 
+            }
         }
-       
+
+        //log( "Projectile " , "type:", projectile.type, "id:", projectile.id , " inited. arr len", this.projectiles.length );
         return projectile;
     }
 
 
 
-     //----
-     random_initial_cards() {
 
-     	this.cards_in_use.length = 0;
-     	this.cards_in_use.push("skeleton");
-		this.cards_in_use.push("giant");
-    	this.cards_in_use.push("knight");
-    	this.cards_in_use.push("archer");
-    	this.cards_in_use.push("wizard");
-    	this.cards_in_use.push("goblin");
-    	this.cards_in_use.push("gargoyle");
-		this.cards_in_use.push("gargoylehorde");
 
-     }
+
+
+
+
+
+
+
+
+
+
+    //------------
+    getRecyclableUnitIndex( ) {
+        let i;
+        for ( i = 6 ; i < this.units.length ; i++ ) {
+            if ( this.units[i] == null ) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
 
     //------------
     getRecyclableUnit( type ) {
         let i;
-        for ( i = 0 ; i < this.units.length ; i++ ) {
-            let u = this.units[i];
-            if ( u.dead == 2 && u.type == type ) {
+        for ( i = 6 ; i < this.units.length ; i++ ) {
+            if ( this.units[i] != null && this.units[i].visible == 0 && this.units[i].type == type ) {
                 return i;
             }
         }
@@ -562,6 +672,27 @@ export class Txstage extends Entity {
 
 
 
+
+
+
+    //------------------
+    removeUnit( u ) {
+
+        log( "Removing unit", u.id );
+
+        engine.removeEntity( this.units[ u.id ] );
+        this.units[ u.id ] = null;
+
+        let i;
+        for ( i =  this.units.length - 1 ; i >= 6 ; i-- ) {
+            // Shorten array if possible
+            if ( this.units[i] == null ) {
+                this.units.length = i;
+            } else {
+                break;
+            }
+        }
+    }
  
 
 
@@ -588,6 +719,8 @@ export class Txstage extends Entity {
         let healthbar_y  = 3;
         let projectile_user = 0;
 
+        let attack_building_only = 0;
+
 
     	// Box2d's collision grouping
     	let categoryBits = 1;
@@ -612,11 +745,13 @@ export class Txstage extends Entity {
     		modelsize 	= 0.20;
     		b2dsize  	= 0.25;
     		model 		= resources.models.giant;
-    	    maxhp       = 1200;
+    	    maxhp       = 3200;
             damage      = 267;
             attackSpeed = 80;
             speed       = 5;
             healthbar_y = 4;
+            attack_building_only = 1;
+
             
     	
     	} else if ( type == "knight" ) {
@@ -625,7 +760,7 @@ export class Txstage extends Entity {
     		modelsize 	= 0.18
     		b2dsize  	= 0.15;
     		model 		= resources.models.knight;
-            maxhp       = 600;
+            maxhp       = 1600;
             damage      = 124;
             attackSpeed = 40;
             speed       = 5;
@@ -664,10 +799,10 @@ export class Txstage extends Entity {
     		b2dsize  	= 0.15;
     		model 		= resources.models.goblin;
     		speed 		= 5.0;
-    		maxhp       = 167;
+    		maxhp       = 10067;
     	    damage      = 99;
             attackSpeed = 20;
-            speed       = 0;
+            speed       = 5;
 
 
     	} else if ( type == "gargoyle" ) {
@@ -699,53 +834,72 @@ export class Txstage extends Entity {
         let unit:Txunit;
         let recyclable_index = this.getRecyclableUnit( type );
 
-        if ( recyclable_index == -1 ) {
-
-
-
-            unit = new Txunit(
-    	    		this.units.length,
-    	    		this,
-    	    		{
-    	  				position: new Vector3( x , y ,  z ),
-    	  				scale   : new Vector3( modelsize, modelsize, modelsize )
-    	  			},
-    	  			{
-    	  				scale   : new Vector3( b2dsize , b2dsize , b2dsize )
-    	  			},
-    	  			model,
-                    type,
-    	  			"dynamic",
-    	  			this.playerindex,
-    	  			isFlying,
-    	  			aggrorange,
-                    healthbar_y
-    	  		);
-            this.units.push( unit );
-
-        } else {
+        if ( recyclable_index >= 0 ) {
 
             unit = this.units[recyclable_index];
             unit.transform.position = new Vector3( x, y, z );
             unit.transform.scale    = new Vector3( modelsize, modelsize, modelsize );
-            unit.type = type;
-            unit.shapetype = "dynamic";
             unit.owner = this.playerindex;
             unit.isFlying = isFlying;
             unit.aggroRange = aggrorange;
             unit.reinstate_box2d( {
                 scale   : new Vector3( b2dsize , b2dsize , b2dsize )
             });
+            if ( unit.owner == 1 ) {
+                unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 255, 0, 0 );
+            } else {
+                unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 0, 0, 200 );
+            }
             unit.dead = 0;
             unit.tick = 0;
+            unit.attacktarget = null ;
+            unit.movetarget   = null ;
+            unit.attacking    = 0;
             unit.healthbar.getComponent( Transform ).scale.x = 1.5;
-            unit.removeComponent( GLTFShape );
-            unit.addComponent( model );
-            unit.reinit();
+            unit.visible = 1;
 
-        }	
 
+            log( "reuse unit entity " , unit.type, unit.id , " inited. arr len", this.units.length );
+
+        } else {
+
+            unit = new Txunit(
+                        this.units.length,
+                        this,
+                        {
+                            position: new Vector3( x , y ,  z ),
+                            scale   : new Vector3( modelsize, modelsize, modelsize )
+                        },
+                        {
+                            scale   : new Vector3( b2dsize , b2dsize , b2dsize )
+                        },
+                        model,
+                        type,
+                        "dynamic",
+                        this.playerindex,
+                        isFlying,
+                        aggrorange,
+                        healthbar_y
+                    );
+
+            
+            recyclable_index = this.getRecyclableUnitIndex();
+
+            if ( recyclable_index == -1 ) {
+                this.units.push( unit );
+            } else {
+                unit.id = recyclable_index;
+                this.units[recyclable_index] = unit;
+            }	
         
+            log( "Unit " , unit.type, unit.id , " inited. arr len", this.units.length );
+        
+        }
+
+
+
+
+
         unit.curhp       = maxhp;
         unit.maxhp       = maxhp;
     	unit.attackRange = attackRange;
@@ -753,7 +907,8 @@ export class Txstage extends Entity {
         unit.attackSpeed = attackSpeed;
         unit.damage      = damage;
         unit.projectile_user = projectile_user;
-
+        unit.attack_building_only = attack_building_only;
+            
 
     	if ( unit.isFlying == 1 ) {
     		categoryBits = 2;
@@ -768,6 +923,21 @@ export class Txstage extends Entity {
 
 
     
+
+     //----
+     random_initial_cards() {
+
+        this.cards_in_use.length = 0;
+        this.cards_in_use.push("skeleton");
+        this.cards_in_use.push("giant");
+        this.cards_in_use.push("knight");
+        this.cards_in_use.push("archer");
+        this.cards_in_use.push("wizard");
+        this.cards_in_use.push("goblin");
+        this.cards_in_use.push("gargoyle");
+        this.cards_in_use.push("gargoylehorde");
+
+     }
 
 
 	//-----------------
