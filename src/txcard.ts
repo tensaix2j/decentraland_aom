@@ -55,14 +55,24 @@ export class Txcard extends Entity {
 		let _this = this;
 
 		this.addComponent( 
-			new OnPointerDown((e) => {
-				_this.stage.card_input_down( e , _this ) ;	
-			})
+			new OnPointerDown(
+				(e) => {
+					_this.stage.card_input_down( e , _this ) ;	
+				},
+				{
+			      distance: 28,
+			    }
+			)
 		);
 		this.addComponent( 
-			new OnPointerUp((e) => {
-				_this.stage.card_input_up( e , _this );	
-			})
+			new OnPointerUp(
+				(e) => {
+					_this.stage.card_input_up( e , _this );	
+				},
+				{
+			      distance: 28,
+			    }
+			)
 		);
 
 

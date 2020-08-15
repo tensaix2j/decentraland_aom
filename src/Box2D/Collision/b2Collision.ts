@@ -373,8 +373,8 @@ export class b2RayCastOutput {
 
 /// An axis aligned bounding box.
 export class b2AABB {
-  public readonly lowerBound: b2Vec2 = new b2Vec2(); ///< the lower vertex
-  public readonly upperBound: b2Vec2 = new b2Vec2(); ///< the upper vertex
+  public lowerBound: b2Vec2 = new b2Vec2(); ///< the lower vertex
+  public upperBound: b2Vec2 = new b2Vec2(); ///< the upper vertex
 
   private readonly m_cache_center: b2Vec2 = new b2Vec2(); // access using GetCenter()
   private readonly m_cache_extent: b2Vec2 = new b2Vec2(); // access using GetExtents()

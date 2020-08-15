@@ -3,6 +3,9 @@
 
 import {b2Vec2} from "src/Box2D/Common/b2Math"
 import {b2World} from "src/Box2D/Dynamics/b2World"
+import {b2QueryCallback} from "src/Box2D/Dynamics/b2WorldCallbacks";
+
+
 import {b2BodyDef}  from "src/Box2D/Dynamics/b2Body"
 import {b2FixtureDef}  from "src/Box2D/Dynamics/b2Fixture"
 import {b2PolygonShape}  from "src/Box2D/Collision/Shapes/b2PolygonShape"
@@ -11,12 +14,15 @@ import {b2BodyType} from "src/Box2D/Dynamics/b2Body"
 import {b2RevoluteJointDef} from "src/Box2D/Dynamics/Joints/b2RevoluteJoint"
 import {b2DistanceJointDef} from "src/Box2D/Dynamics/Joints/b2DistanceJoint"
 import {b2ContactListener} from "src/Box2D/Dynamics/b2WorldCallbacks"
+import {b2AABB}  from "src/Box2D/Collision/b2Collision"
 
 
 import resources from "src/resources";
 import { Txunit } from "src/txunit";
 import { Txcard } from "src/txcard";
 import { Txprojectile } from "src/txprojectile";
+import { Txexplosion } from "src/txexplosion" ;
+
 
 
 export class Txstage extends Entity {
@@ -37,7 +43,12 @@ export class Txstage extends Entity {
     public projectiles = [];
     public cards_in_use = [];
     public txcards = [];
-    
+    public explosions = [];
+
+    public shared_explosion_material;
+
+    public shared_fireball_shape;
+    public shared_fireball_material;
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -212,11 +223,36 @@ export class Txstage extends Entity {
 		ruler.addComponent( new BoxShape() );
 		*/
 
+        
+        let material = new Material();
+        material.albedoTexture = resources.textures.explosion;
+        material.roughness = 1.0;
+        material.specularIntensity = 0;
+        material.transparencyMode  = 2;
+        material.emissiveIntensity = 4.5;
+        material.emissiveColor = Color3.FromInts(252, 164, 23);
+        this.shared_explosion_material = material;
 
-
-        this.card_input_down( null, this.txcards[4] );
-
-   
+        material = new Material();
+        material.albedoTexture = resources.textures.fireball;
+        material.roughness = 1.0;
+        material.specularIntensity = 0;
+        material.transparencyMode  = 2;
+        material.emissiveIntensity = 4.5;
+        material.emissiveColor = Color3.FromInts(252, 164, 23);
+        this.shared_fireball_material = material;
+        this.shared_fireball_shape = new PlaneShape();
+        this.shared_fireball_shape.uvs = [
+            0, 0 ,
+            1, 0 ,
+            1, 1 ,
+            0, 1 ,
+            0, 0 ,
+            1, 0 ,
+            1, 1 ,
+            0, 1 ,
+        ];
+        this.debug() ;
 
 		
 
@@ -236,8 +272,25 @@ export class Txstage extends Entity {
     }   
 
 
+    //-------------
+    debug( ) {
+
+        this.card_input_down( null, this.txcards[4] );
+
+        this.playerindex = -1;
+        this.createUnit( "goblin" , -3, 0 );
+        this.createUnit( "goblin" , -2.9, 0 );
+         
+        this.playerindex = 1;
 
 
+
+        //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
+
+
+
+
+    }   
 
 
     //----------------
@@ -271,6 +324,14 @@ export class Txstage extends Entity {
             }
         }
 
+        let exp;
+        for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
+            let explosion = this.explosions[exp];
+            if ( explosion.visible == 1  ) {
+                explosion.update(dt);
+            }
+        }
+
     }
 
 
@@ -299,7 +360,7 @@ export class Txstage extends Entity {
         } else if ( e.buttonId == 1  ) {
         	// E button
         	this.playerindex = 1;
-            
+
 
         } else if ( e.buttonId == 2 ) {
         	// F button 	
@@ -336,6 +397,64 @@ export class Txstage extends Entity {
     }
 
 
+
+
+
+
+
+     //------------
+    getRecyclableExplosion( ) {
+
+        let i;
+        for ( i = 0 ; i < this.explosions.length ; i++ ) {
+            let explosion = this.explosions[i];
+            if ( explosion.visible == 0  ) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+
+
+    //---------
+    createExplosion( location_v3 , damage , owner ) {
+
+        let explosion:Txexplosion;
+        let recyclable_index = this.getRecyclableExplosion( );
+        
+        if ( recyclable_index == -1 ) {
+
+            let explosion = new Txexplosion(
+                this.explosions.length,
+                this,
+                {
+                    position: location_v3
+                },
+                this.shared_explosion_material,
+                damage,
+                owner
+            ) ;
+            this.explosions.push( explosion );
+
+        } else {
+    
+             //log( srcx, srcy, srcz, dstx, dsty, dstz );
+            explosion = this.explosions[recyclable_index];
+            explosion.getComponent(Transform).position = location_v3;
+            explosion.damage = damage;
+            explosion.owner  = owner;
+            explosion.reinit();
+            explosion.show();
+
+        }
+       
+        return explosion;
+    }
+
+
+
      //------------
     getRecyclableProjectile( type ) {
 
@@ -352,7 +471,7 @@ export class Txstage extends Entity {
 
 
     //------------
-    createProjectile( srcx, srcy, srcz, dstx, dsty, dstz , owner , projectile_type ) {
+    createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage ) {
 
 
         let projectile:Txprojectile;
@@ -361,30 +480,49 @@ export class Txstage extends Entity {
 
         if ( recyclable_index == -1 ) {
             
-            let model;
+            let shape;
             if ( projectile_type == 1 ) {
-                model = resources.models.arrow;
+                
+                shape = resources.models.arrow;
+
             } else if ( projectile_type == 2  ) {
-                model = resources.models.fireball;
+
+
+                shape = this.shared_fireball_shape;
+                
             }
 
             projectile = new Txprojectile(
                         this.projectiles.length,
                         this,
-                        srcx, srcy, srcz, dstx, dsty, dstz,
-                        model,
-                        owner,
-                        projectile_type
+                        src_v3, 
+                        dst_v3,
+                        shape,
+                        attacktarget,
+                        projectile_type,
+                        damage,
+                        owner
                     );
+
+            if ( projectile_type == 2 ) {
+                projectile.getComponent( Transform ).scale.x = 0.5;
+                projectile.getComponent( Transform ).scale.y = 0.5;
+                projectile.addComponent( this.shared_fireball_material );
+                projectile.addComponent( new Billboard() );
+            }
             this.projectiles.push( projectile );
+        
         } else {
 
             //log( srcx, srcy, srcz, dstx, dsty, dstz );
             projectile = this.projectiles[recyclable_index];
-            projectile.getComponent(Transform).position = new Vector3( srcx, srcy, srcz );
-            projectile.dst_transform.position           = new Vector3( dstx, dsty, dstz );
-            projectile.owner = owner;
+            projectile.getComponent(Transform).position = src_v3;
+            projectile.src_v3                           = src_v3;
+            projectile.dst_v3                           = dst_v3;
+            projectile.attacktarget = attacktarget;
             projectile_type = projectile_type;
+            projectile.damage = damage;
+            projectile.owner  = owner;
             projectile.reinit();
             projectile.show();
 
@@ -405,8 +543,8 @@ export class Txstage extends Entity {
     	this.cards_in_use.push("archer");
     	this.cards_in_use.push("wizard");
     	this.cards_in_use.push("goblin");
-    	this.cards_in_use.push("devil");
-		this.cards_in_use.push("devilhorde");
+    	this.cards_in_use.push("gargoyle");
+		this.cards_in_use.push("gargoylehorde");
 
      }
 
@@ -478,7 +616,7 @@ export class Txstage extends Entity {
             damage      = 267;
             attackSpeed = 80;
             speed       = 5;
-            healthbar_y = 5;
+            healthbar_y = 4;
             
     	
     	} else if ( type == "knight" ) {
@@ -516,9 +654,9 @@ export class Txstage extends Entity {
             damage      = 124;
             attackSpeed = 40;
             speed       = 5;
-            attackRange = 3.5;
+            attackRange = 4.5;
             projectile_user = 1;
-            
+                
     	
     	} else if ( type == "goblin" ) {
     		y 			= 1.6;
@@ -529,14 +667,15 @@ export class Txstage extends Entity {
     		maxhp       = 167;
     	    damage      = 99;
             attackSpeed = 20;
+            speed       = 0;
 
 
-    	} else if ( type == "devil" ) {
+    	} else if ( type == "gargoyle" ) {
     		
-    		y 			= 2.7;
-    		modelsize 	= 0.25;
-    		b2dsize  	= 0.25;
-    		model 		= resources.models.devil;
+    		y 			= 2.0;
+    		modelsize 	= 0.18;
+    		b2dsize  	= 0.18;
+    		model 		= resources.models.gargoyle;
     		isFlying    = 1;
             maxhp       = 600;
             damage      = 124;
@@ -544,11 +683,11 @@ export class Txstage extends Entity {
             speed       = 5;
             
 
-    	} else if ( type == "devilhorde" ) {
-    		y 			= 2.7;
-    		modelsize 	= 0.15;
-    		b2dsize  	= 0.15;
-    		model 		= resources.models.devil;
+    	} else if ( type == "gargoylehorde" ) {
+    		y 			= 2.0;
+    		modelsize 	= 0.12;
+    		b2dsize  	= 0.12;
+    		model 		= resources.models.gargoyle;
     		isFlying    = 1;
             maxhp       = 600;
             damage      = 124;

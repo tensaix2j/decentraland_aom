@@ -690,6 +690,7 @@ export class b2World {
   public QueryAABB(callback: b2QueryCallback, aabb: b2AABB): void;
   public QueryAABB(aabb: b2AABB, fn: b2QueryCallbackFunction): void;
   public QueryAABB(...args: any[]): void {
+    
     if (args[0] instanceof b2QueryCallback) {
       this._QueryAABB(args[0], args[1]);
     } else {
@@ -697,10 +698,12 @@ export class b2World {
     }
   }
   private _QueryAABB(callback: b2QueryCallback | null, aabb: b2AABB, fn?: b2QueryCallbackFunction): void {
+
     this.m_contactManager.m_broadPhase.Query(aabb, (proxy: b2TreeNode<b2FixtureProxy>): boolean => {
       const fixture_proxy: b2FixtureProxy = proxy.userData;
       // DEBUG: b2Assert(fixture_proxy instanceof b2FixtureProxy);
       const fixture: b2Fixture = fixture_proxy.fixture;
+      
       if (callback) {
         return callback.ReportFixture(fixture);
       } else if (fn) {

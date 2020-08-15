@@ -11,17 +11,19 @@ export class Txprojectile extends Entity {
 	public parent;
 
 
-	public src_transform;
-	public dst_transform;
+	public dst_v3;
+	public src_v3;
 
-	public visible_ypos;
 	public visible = 1;
 	public speed = 0.3;
 
+	public attacktarget;
+	public damage;
 	public owner;
+	
 	public type;
 
-	constructor( id, parent , srcx, srcy, srcz, dstx, dsty, dstz , model , owner ,type ) {
+	constructor( id, parent , src_v3, dst_v3 , shape , attacktarget ,type , damage , owner ) {
 
 		super();
 		engine.addEntity(this);
@@ -29,21 +31,21 @@ export class Txprojectile extends Entity {
 
 		this.id = id;
 		this.parent = parent;
-		this.owner = owner;
 		this.type = type;
+		this.attacktarget = attacktarget;
+		this.damage = damage;
+		this.owner  = owner;
 
-		this.dst_transform = new Transform({
-			position: new Vector3( dstx, dsty, dstz )
-		});
+		this.dst_v3 = dst_v3;
+		this.src_v3 = src_v3;
 
 		let transform = new Transform({
-			position: new Vector3( srcx, srcy, srcz )
+			position: this.src_v3
 		});
 
 		this.addComponent( transform );
-		this.addComponent( model );
+		this.addComponent( shape );
 		
-		this.visible_ypos = this.getComponent(Transform).position.y;
 		this.reinit();
 	}
 
@@ -51,7 +53,6 @@ export class Txprojectile extends Entity {
 	//--------------
 	reinit() {
 
-		this.visible_ypos = this.getComponent(Transform).position.y;
 		//log( "Projectile" , this.id , "reinited" , this.getComponent(Transform).position.y , this.speed ) ;
 	}
 
@@ -61,8 +62,8 @@ export class Txprojectile extends Entity {
 		
 		let transform = this.getComponent(Transform);
 
-		let diff_x = this.dst_transform.position.x -  transform.position.x;
-		let diff_z = this.dst_transform.position.z -  transform.position.z;
+		let diff_x = this.dst_v3.x -  transform.position.x;
+		let diff_z = this.dst_v3.z -  transform.position.z;
 
     	var hypsqr = diff_x * diff_x + diff_z * diff_z  ;
 
@@ -79,24 +80,59 @@ export class Txprojectile extends Entity {
 	    		
 
 	    		// extra
-	    		let diff_y = this.dst_transform.position.y -  transform.position.y;
+	    		let diff_y = this.dst_v3.y -  transform.position.y;
     			var rad2 = Math.atan2( diff_y, diff_z );
 	    		var delta_y = this.speed * Math.sin(rad2);
 	    		var deg2    = rad2 * 180.0 / Math.PI;
 	    		transform.position.y += delta_y;
 	    		
-	    		transform.lookAt( this.dst_transform.position );
+	    		transform.lookAt( this.dst_v3 );
 
 	    } else {
 
-	    	if ( this.owner != null && this.owner.attacktarget != null && this.owner.attacktarget.dead == 0 ) {
-	    		this.owner.inflict_damage();
+	    	if ( this.type == 1 ) {
+	    		// Arrow
+		    	if ( this.attacktarget != null && this.attacktarget.dead == 0 ) {
+		    		this.inflict_damage();
+		    	}
+	    	} else if ( this.type == 2 ) {
+	    		// Fireball
+	    		this.parent.createExplosion( 
+	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
+	    			this.damage,
+	    			this.owner
+	    		);
 	    	}
+
+
 	    	this.owner = null;
 	    	this.hide();
 	    }
 	}
 
+
+
+	//---
+	inflict_damage() {
+
+		if ( this.attacktarget != null ) {
+			
+			this.attacktarget.curhp -= this.damage;
+			if ( this.attacktarget.curhp < 0 ) {
+				this.attacktarget.curhp = 0;
+			}
+			//log( this.type, this.id , "hits " , this.attacktarget.type, this.attacktarget.id , " remaining hp = " , this.attacktarget.curhp , this.attacktarget.maxhp )
+
+			let hp_perc = this.attacktarget.curhp / this.attacktarget.maxhp ;
+			this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
+			if ( this.attacktarget.curhp <= 0 ) {
+				
+				//log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );
+				this.attacktarget.die();
+				this.attacktarget = null;
+			}
+		}
+	}
 	
 
 	//----------
@@ -116,7 +152,6 @@ export class Txprojectile extends Entity {
 	//---
 	show() {
 		this.visible = 1;
-		this.getComponent(Transform).position.y = this.visible_ypos;
 		//this.getComponent(GLTFShape).visible = true;
 	}
 }
