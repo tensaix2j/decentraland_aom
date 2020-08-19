@@ -80,7 +80,9 @@ export class Txprojectile extends Entity {
 	    		this.parent.createExplosion( 
 	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
 	    			this.damage,
-	    			this.owner
+	    			this.owner, 
+	    			1,
+	    			1
 	    		);
 	    	}
 

@@ -73,8 +73,8 @@ export class Txexplosion extends Entity {
 	}
 
 
-	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 ];
-	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 ];
+	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2, 3 ];
+	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 , 0 , 0 , 0 , 0];
 
 
 	//-------
@@ -122,30 +122,31 @@ export class Txexplosion extends Entity {
 				this.tick -= 1;
 			} else {
 				
-				if ( this.frame_index == 3 ) {
-
-					this.find_nearby_units();
-					// No attack target ? look for one within aggro range. 
-					let i;
-					for ( i = 0 ; i < this.units_in_proximity.length ; i++ ) {
-
-						let u = this.units_in_proximity[i];
-						if ( u != null && u.dead == 0 && u.owner != this.owner ) {
-							this.inflict_damage( u );
-						}
-					}
-
-				} else if ( this.frame_index + 1 >= 12 ) {
+				if ( this.frame_index + 1 >= 16 ) {
 					
 					this.hide();
 
-				} 
+				} else {
 
-				this.frame_index = ( this.frame_index + 1 ) % 12;
-				this.getComponent( PlaneShape ).uvs = this.getUV_coord();
+					if ( this.frame_index == 3 ) {
+
+						this.find_nearby_units();
+						// No attack target ? look for one within aggro range. 
+						let i;
+						for ( i = 0 ; i < this.units_in_proximity.length ; i++ ) {
+
+							let u = this.units_in_proximity[i];
+							if ( u != null && u.dead == 0 && u.owner != this.owner ) {
+								this.inflict_damage( u );
+							}
+						}
+
+					} 
 				
-				this.tick = this.tick_per_frame;
-
+					this.frame_index = ( this.frame_index + 1 ) % 16;
+					this.getComponent( PlaneShape ).uvs = this.getUV_coord();
+					this.tick = this.tick_per_frame;
+				}	
 			}
 
 		} else {

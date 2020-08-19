@@ -22,6 +22,9 @@ import { Txunit } from "src/txunit";
 import { Txcard } from "src/txcard";
 import { Txprojectile } from "src/txprojectile";
 import { Txexplosion } from "src/txexplosion" ;
+import { Txclock } from "src/txclock";
+import { Txscoreboard } from "src/txscoreboard";
+import { Txclickable_box} from "src/txclickable_box";
 
 
 
@@ -41,14 +44,46 @@ export class Txstage extends Entity {
 	public card_sel_index = 0;
 
     public projectiles = [];
-    public cards_in_use = [];
-    public txcards = [];
     public explosions = [];
+    public clocks = [];
 
-    public shared_explosion_material;
-
+    
     public shared_fireball_shape;
     public shared_fireball_material;
+
+    public shared_explosion_material;
+    public shared_clock_material;
+
+
+    public uitxt_score_r ;
+    public uitxt_score_b ;
+    public uitxt_instruction;
+    public uitxt_time ;
+
+    public score_r = 0;
+    public score_b = 0;
+    public time_remaining = 180;
+    public tick = 0;
+    public sudden_death = 0;
+
+    public buttons = {};
+    public current_mana = 100;
+    public uiimage_manabar ;
+
+    public game_state = 0;
+    public menu_page  = 0;
+    public menu_labels = {};
+
+
+    public card_sel_parent ;
+    public player_cards_collection = [];
+    public player_cards_in_use    = [];
+    public txcard_selected:Txcard = null ;
+
+    public animate_button_tick = 0;
+    public animate_button_callback_id = "";
+
+
 
 	constructor( id, userID , transform_args , camera ) {
 
@@ -90,11 +125,894 @@ export class Txstage extends Entity {
 
 
         this.construct_box2d_shapes();
+       
+    	
+    	/*
+		let ruler = new Entity();
+		ruler.setParent(this);
+		ruler.addComponent( new Transform( {
+			position: new Vector3(  3 , 2,  0 ),
+			scale   : new Vector3(  0.8,  1, 1.2  )
+		});
+		ruler.addComponent( new BoxShape() );
+		this.debug() ;
+
+        */
+
+
+
         
-        let i ;
+		
+
+    	battleground.addComponent( 
+			new OnPointerDown((e) => {
+				_this.global_input_down( e );	
+			})
+		);
+		battleground.addComponent( 
+			new OnPointerUp((e) => {
+				_this.global_input_up( e );	
+			})
+		);
+
+
+        let scoreboard = new Txscoreboard(
+            0,
+            this,
+            {
+                position: new Vector3(0,8,0)
+            }
+        )
+
+
+        this.init_castles();
+        this.init_ui_2d();
+        this.init_ui_3d();
+        this.init_shared_material();
+
+
+         this.init_player_cards_collection();
+
+
+        this.update_button_ui();
+    }   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //-------------
+    debug( ) {
+
+        //this.card_input_down( null, this.player_cards_collection[3] );
+
+        //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
+
+        //this.playerindex = -1;
+        //this.createUnit( "goblin", 0,0 );
+        //this.playerindex = 1;
+
+       // this.createClock( new Vector3(0,2,0 ) );
+
+
+
+    }   
+
+
+
+
+
+
+
+    //-------------------------
+    //
+    //
+    //          Updates
+    //
+    //
+    //-----------------------------
+
+
+
+    //----------------
+	step(dt:number) {
+    	
+    	this.world.Step( 0.05  , 10, 10 );
+    	
+    }
+
+
+    //--
+    update(dt) {
+    	
+        
+        this.step(dt);
+        let u;
+        for ( u = 0 ; u < this.units.length ; u++) {
+            let unit = this.units[u];
+            if ( unit != null  ) {
+                unit.update(dt);
+            } 
+        }
+
+        let p;
+        for ( p = 0 ; p < this.projectiles.length ; p++ ) {
+            let projectile = this.projectiles[p];
+            if ( projectile != null  ) {
+                projectile.update(dt);
+            }
+        }
+
+        let exp;
+        for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
+            let explosion = this.explosions[exp];
+            if ( explosion != null  ) {
+                explosion.update(dt);
+            }
+        }
+         
+
+        let cl;
+        for ( cl = 0 ; cl < this.clocks.length ; cl++ ) {
+            let clock = this.clocks[cl];
+            if ( clock != null  ) {
+                clock.update(dt);
+            }
+        }
+
+        if ( this.game_state == 1 ) {
+            this.update_mana();
+            this.update_score();
+            this.update_time();
+        } else {
+            this.update_animate_button();
+        }
+    }
+
+
+
+    //-----------
+    update_mana() {
+
+        if ( this.current_mana < 100 ) {
+            this.current_mana += 0.1 ;
+        }
+        
+        let calc_height = ( this.current_mana  * 478 / 100 ) >> 0;
+        this.uiimage_manabar.height = calc_height;
+        this.uiimage_manabar.positionY =   -( 256 - calc_height / 2 );
+    }
+
+
+    //-----------
+    update_score() {
+        this.uitxt_score_r.value = this.score_r ;
+        this.uitxt_score_b.value = this.score_b ;
+    }
+
+    update_time() {
+
+        if ( this.game_state == 1 ) {
+            this.tick += 1 ;
+            
+            if ( this.tick > 30 ) {
+                this.tick = 0 ;
+
+
+                if ( this.time_remaining > 0 ) {
+                    this.time_remaining -= 1;
+                } else {
+
+                    if ( this.sudden_death == 1 || this.score_b != this.score_r ) {
+                        this.endgame();
+                    } else {
+                        this.sudden_death = 1 ;
+                        this.time_remaining = 60;
+                    }
+                    
+                }
+            }
+
+            if ( this.game_state == 1 ) {
+                
+                let minutes_rem = (this.time_remaining / 60 ) >> 0;
+                let seconds_rem = this.time_remaining % 60;
+
+                let zeropad = ""
+                if ( (seconds_rem).toString().length == 1 ) {
+                    zeropad = "0";
+                }
+
+                let extra_note = "";
+                if ( this.sudden_death == 1 ) {
+                    extra_note = "Extra Time:\n";
+                }
+                this.uitxt_time.value = extra_note + "" + minutes_rem + ":" + zeropad +  seconds_rem 
+            
+            }
+            if ( this.sudden_death == 1 ) {
+                this.uitxt_time.color = Color3.Red();
+            } else {
+                this.uitxt_time.color = Color3.White();
+            }
+        }
+    }
+
+
+
+    //------------------------------------
+    update_button_ui( ) {
+
+        let b;
+        for ( b in this.buttons ) {
+            this.buttons[b].hide();
+        }
+        for ( b in this.menu_labels ) {
+            this.menu_labels[b].getComponent( TextShape ).value = "";
+        }
+        this.card_sel_parent.getComponent(Transform).position.y  = -999;
+            
+        
+        if ( this.game_state == 0 ) { 
+
+            if  ( this.menu_page == 0 ) {
+            
+                this.buttons["singleplayer"].show();
+                this.buttons["multiplayer"].show();
+            
+            } else if ( this.menu_page == 1  ) {
+
+                this.card_sel_parent.getComponent(Transform).position.y = 2;
+                this.menu_labels["lbl1"].getComponent(TextShape).value = "Please Select 8 cards to use in battle"
+                this.buttons["confirm"].show();
+                this.buttons["cancel"].show();
+                
+            }   
+
+        } else if ( this.game_state == 1 ) {
+
+            this.card_sel_parent.getComponent(Transform).position.y = 2;
+
+
+
+        } else if ( this.game_state == 2 ) {
+
+
+            this.buttons["leavegame"].show();
+        }
+    }
+
+
+
+
+    //--------------
+    reset_game() {
+        
+        this.time_remaining = 180;
+        this.sudden_death = 0;
+        this.score_r = 0;
+        this.score_b = 0;
+
+        // Clear everything.
+        let u;
+        for ( u = this.units.length ; u >= 0 ;  u--) {
+            let unit = this.units[u];
+            if ( unit != null ) {
+                this.removeUnit( unit ); 
+            }
+        }
+
+        let p;
+        for ( p = this.projectiles.length ; p >= 0 ; p-- ) {
+            let projectile = this.projectiles[p];
+            if ( projectile != null  ) {
+                this.removeProjectile( projectile );
+            }
+        }
+
+        let exp;
+        for ( exp = this.explosions.length ; exp >= 0 ; exp-- ) {
+            let explosion = this.explosions[exp];
+            if ( explosion != null  ) {
+               this.removeExplosion( explosion );
+            }
+        }
+        
+        let cl;
+        for ( cl = this.clocks.length ; cl >= 0 ; cl-- ) {
+            let clock = this.clocks[cl];
+            if ( clock != null  ) {
+                this.removeClock( clock );
+            }
+        }
+
+        this.uitxt_instruction.value = "";
+
+        this.init_castles();    
+        this.update_score();
+
+    }
+
+
+
+    //---------------------------
+    //
+    //         INPUTS
+    //
+    //---------------------------
+
+
+
+    global_input_down(e) {
+
+        if ( e.buttonId == 0 ) {
+
+            if ( this.game_state == 1 ) {
+            	if ( e.hit ) {
+
+    				let hitEntity = engine.entities[e.hit.entityId];
+    				
+    				if (  hitEntity == this.battleground ) {
+    					
+    					let place_x = e.hit.hitPoint.x - this.transform.position.x;
+    					let place_z = e.hit.hitPoint.z - this.transform.position.z;
+    					
+    					if ( this.txcard_selected != null ) {
+    						
+                            if ( this.placement_is_allowed( this.txcard_selected , place_x , place_z ) == 1  ) {
+                                this.current_mana -= this.txcard_selected.manaCost;
+                                this.spawnUnit( this.txcard_selected.type , place_x , place_z );
+                                this.rotate_card_in_use();
+
+                            } else {
+                                this.uitxt_instruction.text = "Not allowed to place there."
+                            }
+    								
+    					}
+
+    				}
+    			}
+            }
+
+        } else if ( e.buttonId == 1  ) {
+        	// E button
+        	//this.playerindex = 1;
+            this.current_mana += 10;
+            this.update_mana();
+
+        } else if ( e.buttonId == 2 ) {
+        	// F button 	
+        	
+            //this.playerindex = -1;
+            this.current_mana -= 10;
+            this.update_mana();
+            
+        }	
+     }
+
+
+
+     //----------------------
+    global_input_up(e) {
+
+        if ( e.buttonId == 0 ) {
+      	
+        } else if ( e.buttonId == 1 ) {
+            
+            this.units[6].playAnimation("Walking", 1 );
+
+        } else if ( e.buttonId == 2 ) {
+
+            this.units[7].playAnimation("Walking", 1 );
+
+        }
+     }
+
+
+
+    //------------------
+    txclickable_button_onclick( id , userData ) {
+        
+        
+        this.animate_button_tick = 20;
+        this.animate_button_callback_id = id;
+
+   }
+
+
+   //-------------------------
+   update_animate_button() {
+        
+        if ( this.animate_button_callback_id != "" ) {
+   
+            if ( this.animate_button_tick > 0 ) {
+
+                this.animate_button_tick -= 1;
+                
+                if ( this.animate_button_callback_id == "singleplayer" ) {
+                           
+                    this.buttons["singleplayer"].getComponent(Transform).position.y -= 0.35;
+                    this.buttons["multiplayer"].getComponent(Transform).position.y -= 0.35;
+        
+                } else if ( this.animate_button_callback_id == "cancel" || this.animate_button_callback_id == "confirm" ) {
+
+                    this.buttons["confirm"].getComponent(Transform).position.y -= 0.35;
+                    this.buttons["cancel"].getComponent(Transform).position.y -= 0.35;
+                    this.card_sel_parent.getComponent( Transform ).position.y -= 0.35;
+
+                } else if ( this.animate_button_callback_id == "leavegame" ) {
+
+                     this.buttons["leavegame"].getComponent(Transform).position.y -= 0.35;
+                }
+
+            } else {
+
+                if ( this.animate_button_callback_id == "singleplayer" ) {
+                    this.buttons["singleplayer"].getComponent(Transform).position.y = 5;
+                    this.buttons["multiplayer"].getComponent(Transform).position.y  = 4;
+                
+                } else if ( this.animate_button_callback_id == "cancel" || this.animate_button_callback_id == "confirm" ) {
+
+                    this.buttons["confirm"].getComponent(Transform).position.y = 7;
+                    this.buttons["cancel"].getComponent(Transform).position.y  = 7;
+                    this.card_sel_parent.getComponent( Transform ).position.y  = 2;
+
+                } else if ( this.animate_button_callback_id == "leavegame" ) {
+
+                    this.buttons["leavegame"].getComponent(Transform).position.y = 5;
+                }
+
+
+                this.txclickable_button_onclick_animate_done_continue( this.animate_button_callback_id );
+                this.animate_button_callback_id  = "";
+            }
+        }
+   }
+
+
+
+   //--------------
+   txclickable_button_onclick_animate_done_continue( id ) {
+
+        if ( id == "singleplayer" ) {
+
+            this.menu_page = 1;
+            this.rearrange_cards_collection();
+            this.update_button_ui();
+
+        } else if ( id == "cancel" ) {
+
+            this.menu_page = 0;
+            this.update_button_ui();
+
+        } else if ( id == "confirm" ) {
+
+            if ( this.game_state == 0 && this.menu_page == 1 ) {
+                if ( this.count_card_selected() == 8 ) {
+
+                    this.fill_player_cards_selected();
+                    this.rearrange_cards_selected(); 
+                    this.game_state = 1;
+                    this.update_button_ui();
+                    this.menu_labels["lbl1"].getComponent( TextShape ).value = "Battle Begins!";
+                } else {
+                     this.menu_labels["lbl1"].getComponent( TextShape ).value = "Please select exactly 8 cards";
+                }
+            }
+        } else if ( id == "leavegame" ) {
+
+            this.game_state = 0;
+            this.menu_page = 0;
+
+            this.reset_game();
+            this.update_button_ui();
+        }
+   }
+
+
+
+    //---------------------------
+    card_input_down( e, txcard ) {
+
+        if ( this.game_state == 0 ) {
+
+            if ( this.count_card_selected() >= 8 && txcard.isSelected == 0 ) {
+                this.menu_labels["lbl1"].getComponent( TextShape ).value = "Maximum 8 cards. Click on the selected card to unselect " ;
+            } else {
+                txcard.toggle();
+            }
+
+
+            this.menu_labels["lbl2"].getComponent( TextShape ).value = "Cards Selected: " + this.count_card_selected() ;
+        
+
+        } else if ( this.game_state == 1 ) {
+    	      
+            let i;
+            for ( i = 0 ; i < 8 ; i++ ) {
+                this.player_cards_in_use[i].turnoff();
+            }
+            txcard.turnon(); 
+            this.txcard_selected = txcard ;
+        }
+
+    }
+
+
+
+    //---------------------------
+    card_input_up( e, type ) {
+    
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //---------
+    get_txcard_selected_index() {
+        let i;
+        for ( i = 0 ; i < 4 ; i++ ) {
+            if ( this.player_cards_in_use[i] == this.txcard_selected ) {
+                return i;
+            }
+        }
+        return -1;   
+    }
+
+
+
+    //----------------
+    rotate_card_in_use() {
+
+        let i;
+
+        if ( this.txcard_selected != null ) {
+            
+            let card_selected_index = this.get_txcard_selected_index();
+            this.player_cards_in_use[card_selected_index] = this.player_cards_in_use[4];
+            this.player_cards_in_use[4] = this.player_cards_in_use[5];
+            this.player_cards_in_use[5] = this.player_cards_in_use[6];
+            this.player_cards_in_use[6] = this.player_cards_in_use[7];
+            this.player_cards_in_use[7] = this.txcard_selected;
+            this.txcard_selected.turnoff();
+        }
+        this.txcard_selected = null;
+        this.rearrange_cards_selected(); 
+        
+    }
+
+
+
+
+    //--------------------
+    fill_player_cards_selected() {
+
+        let i;
+        this.player_cards_in_use.length = 0;
+        for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
+            if ( this.player_cards_collection[i].isSelected ) {
+                let txcard = this.player_cards_collection[i];
+                this.player_cards_in_use.push( txcard );
+            }
+        }
+    }
+
+
+    //------------------
+    rearrange_cards_collection() {
+
+        let i;
+
+        for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
+            
+            let txcard = this.player_cards_collection[i];
+            let x = ( i % 4 ) * 1.2;
+            let y = ((i / 4)  >> 0 ) * 1.2;
+            
+            txcard.reposition( x,y );
+            txcard.show();
+            txcard.turnoff();
+        }
+
+    }
+
+    //------------------
+    rearrange_cards_selected() {
+
+        let i;
+
+        for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
+            let txcard = this.player_cards_collection[i];
+            txcard.hide();
+        }
+
+        for ( i = 0 ; i < 4 ; i++ ) {
+            
+            let x = ( i % 4 ) * 1.2;
+            let y = ((i / 4)  >> 0 ) * 1.2;
+            
+            let txcard = this.player_cards_in_use[i];
+            txcard.reposition( x,y );
+            txcard.show();
+            txcard.turnoff();
+            
+        }
+    }
+
+    //-----
+    count_card_selected() {
+
+        let i;
+        let count = 0;
+        for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
+            if ( this.player_cards_collection[i].isSelected ) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+
+
+
+    //-----------------------------------------------------
+    placement_is_allowed( txcard , place_x , place_z ) {
+
+        if ( this.current_mana < txcard.manaCost ) {
+            return 0;           
+        }
+
+        if ( txcard.isSpell == 1  ) {
+            return 1;
+        } else {
+            if ( this.playerindex == 1 && place_z <= 0 ) {
+                return 1;
+            } else if ( this.playerindex == -1 && place_z >= 0 ) {
+                return 1;
+            } else if ( this.playerindex == 1 && place_z <= 4 ) {
+                if ( place_x < 0 && ( this.units[0] == null || this.units[0] && this.units[0].dead > 0 )  ) {
+                    return 1;
+                } else if ( place_x > 0 && ( this.units[1] == null || this.units[1] && this.units[1].dead > 0 )  ) {
+                    return 1;
+                }
+            } else if ( this.playerindex == -1 && place_z >= -4 ) {
+                if ( place_x < 0 && ( this.units[3] == null || this.units[3] && this.units[3].dead > 0 )  ) {
+                    return 1;
+                } else if ( place_x > 0 && ( this.units[4] == null || this.units[4] && this.units[4].dead > 0 )  ) {
+                    return 1;
+                }
+            }
+        }
+        return 0;
+    }
+
+
+
+    endgame( ) {
+    
+        this.game_state = 2;
+        let final_txt = "Game Over.\n";
+        if ( this.score_r > this.score_b ) {
+            final_txt += "Red Wins!";
+        } else if ( this.score_r < this.score_b ) {
+            final_txt += "Blue Wins!";
+        } else {
+            final_txt += "Draw Game";
+        }
+        final_txt += "\n\nClick Restart to play again";
+        this.uitxt_instruction.value = final_txt;
+        this.uitxt_time.value = "";
+
+        this.update_score();
+        this.update_button_ui();
+    }
+
+
+
+
+
+    //-----------
+    unit_on_die( unit ) {
+        
+        if ( this.game_state == 1 ) {
+
+            if ( unit.id == 2 ) {
+                // Red wins
+                this.score_r = 3;
+                this.endgame();
+                        
+            } else if ( unit.id == 4 ) {
+                // Blue wins
+                this.score_b = 3;
+                this.endgame();
+
+            
+            } else if ( unit.id == 0 ) {
+                this.score_r += 1;
+                if ( this.sudden_death == 1 ) {
+                    this.endgame();
+                }
+
+            } else if ( unit.id == 1 ) {
+                this.score_r += 1;
+                if ( this.sudden_death == 1 ) {
+                    this.endgame();
+                }            
+            } else if ( unit.id == 3 ) {
+                this.score_b += 1;
+                if ( this.sudden_death == 1 ) {
+                    this.endgame();
+                }    
+            } else if ( unit.id == 4 ) {
+                this.score_b += 1;
+                if ( this.sudden_death == 1 ) {
+                    this.endgame();
+                }
+            } 
+        }
+    }
+
+
+
+
+    //----
+    init_ui_3d() {
+
         
 
 
+        this.menu_labels["lbl1"] = new Entity();
+        this.menu_labels["lbl1"].addComponent( new TextShape() );
+        this.menu_labels["lbl1"].addComponent( new Transform(
+            {
+                position:new Vector3( -8,  6 , 4 ),
+                scale   :new Vector3( 0.2, 0.2, 0.2 )
+            }
+        ));
+        this.menu_labels["lbl1"].addComponent( new Billboard() );
+        this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl1"].setParent( this );
+
+
+        this.menu_labels["lbl2"] = new Entity();
+        this.menu_labels["lbl2"].addComponent( new TextShape() );
+        this.menu_labels["lbl2"].addComponent( new Transform(
+            {
+                position:new Vector3( -8,  5.5 , 4 ),
+                scale   :new Vector3( 0.2, 0.2, 0.2 )
+            }
+        ));
+        this.menu_labels["lbl2"].addComponent( new Billboard() );
+        this.menu_labels["lbl2"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl2"].setParent( this );
+
+
+
+        this.init_buttons();
+    }   
+
+
+
+
+
+
+    //-----------------
+    init_buttons() {
+
+        this.buttons["singleplayer"] = new Txclickable_box(
+            "Single Player" , 
+            "singleplayer",
+            {
+                position: new Vector3(-8, 5,  0),
+                scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this
+        );
+
+
+        
+        this.buttons["multiplayer"] = new Txclickable_box(
+            "Multi Player",
+            "multiplayer", 
+            {
+                 position: new Vector3(-8, 4,  0),
+                 scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this
+        );
+
+
+        
+
+        this.buttons["confirm"] = new Txclickable_box(
+            "Confirm" , 
+            "confirm",
+            {
+                position: new Vector3( -8 , 7,  -1),
+                scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this
+        );
+        this.buttons["confirm"].hide();
+
+
+        this.buttons["cancel"] = new Txclickable_box(
+            "Cancel" , 
+            "cancel",
+            {
+                position: new Vector3( -8 , 7,  2),
+                scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this
+        );
+        this.buttons["cancel"].hide();
+
+
+
+
+        this.buttons["leavegame"] = new Txclickable_box(
+            "Leave Game" ,
+            "leavegame", 
+            {
+                position: new Vector3(-8, 5, 0),
+                scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this
+        );
+        this.buttons["leavegame"].hide();
+        
+        
+    }   
+
+
+    //---
+    init_castles() {
+
+        let i;
         let tower_x  = [ -2.95  , 2.95,    0,  -2.95,    2.95,        0  ];
         let tower_z  = [  4.55  , 4.55,  6.7,  -4.55,   -4.55,     -6.7  ];
         let tower_r  = [   1.0,    1.0,  1.5,    1.0,     1.0,      1.5  ];
@@ -111,119 +1029,147 @@ export class Txstage extends Entity {
 
         for ( i = 0 ; i < tower_x.length ; i++ ) {
 
-	      	
-	      	let x = tower_x[i];
-	      	let z = tower_z[i];
-	      	let r = tower_r[i];
+            
+            let x = tower_x[i];
+            let z = tower_z[i];
+            let r = tower_r[i];
             let model = tower_m[i];
-	      	let owner = tower_o[i];
-	      		   
-	      	let tower = new Txunit( 
-	      			this.units.length, 
-	      			this, 
-	      			{
-	      				position: new Vector3( x,  2, z ),
-	      				scale   : new Vector3( r, 1,  r )
-	      			},
-	      			{
-	      				scale   : new Vector3( r,  r , r )
-	      			},
-	      			model,
+            let owner = tower_o[i];
+                   
+            let tower = new Txunit( 
+                    this.units.length, 
+                    this, 
+                    {
+                        position: new Vector3( x,  2, z ),
+                        scale   : new Vector3( r, 1,  r )
+                    },
+                    {
+                        scale   : new Vector3( r,  r , r )
+                    },
+                    model,
                     "tower",
-	      			"static",
-	      			owner,
-	      			0,
-	      			tower_aggrorange,
+                    "static",
+                    owner,
+                    0,
+                    tower_aggrorange,
                     1.5
-	      	);
+            );
 
             tower.attackRange   = 10.0;
-            tower.maxhp         = 14400;
+            tower.maxhp         = 2500;
             tower.curhp         = tower.maxhp;
-            tower.damage        = 60;
+            tower.damage        = 0;
             tower.projectile_user = 1;
 
 
             this.units.push( tower );
-    	}
+        }
+    }
 
 
-    	
-    	this.random_initial_cards();
-
-    	let card_sel_parent = new Entity();
-    	card_sel_parent.addComponent( new Transform( {
-    		position: new Vector3( -8 , 2, 0 )
-    	}));
-    	card_sel_parent.setParent( this );
-    	card_sel_parent.addComponent( new Billboard( false, true, false ) );
 
 
-    	let card_sel_3d_ui = new Entity();
-    	card_sel_3d_ui.setParent(card_sel_parent);
-    	
-    	let card_sel_3d_ui_transform = new Transform( {
-    		position: new Vector3( 0, 0, 0 ),
-    	});
-    	card_sel_3d_ui.addComponent( card_sel_3d_ui_transform );  
-    	card_sel_3d_ui_transform.rotation.eulerAngles = new Vector3( 0 , 180, 0 );
-    	
-
-    	
-    	// Individual cards
-    	for ( i = 0 ; i < this.cards_in_use.length ; i++ ) {
-
-    		let x = ( i % 2 ) * 1.2;
-    		let y = ((i / 2)  >> 0 ) * 1.2;
-    		let z = 0;
-
-    		let txcard = new Txcard(
-    			"c" + i ,
-    			card_sel_3d_ui,
-    			{
-    				position: new Vector3( x, y, z),
-    				scale   : new Vector3(1, 1, 1)
-    			},
-    			this.cards_in_use[i],
-    			this
-    		);
-
-            this.txcards.push( txcard );
-    	}
-    	// Card selected highlight 
-    	
-    	let card_sel_highlight_material = new Material();
-    	card_sel_highlight_material.emissiveColor = Color3.Green();
-    	card_sel_highlight_material.emissiveIntensity = 4.0;
+    //--------------
+    init_ui_2d() {
 
 
-    	this.card_sel_highlight = new Entity();
-    	this.card_sel_highlight.setParent( card_sel_3d_ui );
-    	this.card_sel_highlight.addComponent( new BoxShape() );
-    	this.card_sel_highlight.addComponent( new Transform( {
-    		position: new Vector3(0,   0  ,  0.08),
-    		scale   : new Vector3(1.1 , 1.1,  0.1)
-    	}));
-    	this.card_sel_highlight.addComponent( card_sel_highlight_material );
+        let ui_2d_canvas = new UICanvas();
+        //    ui_2d_canvas.height = 4000;
 
-		    
+        let ui_2d_image = new UIImage(ui_2d_canvas, resources.textures.crown_r );
+        ui_2d_image.vAlign = "bottom";
+
+        ui_2d_image.width = 40;
+        ui_2d_image.height = 40;
+        ui_2d_image.sourceWidth = 128;
+        ui_2d_image.sourceHeight = 128;
+        ui_2d_image.positionX = -100;
+
+        ui_2d_image = new UIImage(ui_2d_canvas, resources.textures.crown_b );
+        ui_2d_image.vAlign = "bottom";
+
+        ui_2d_image.width = 40;
+        ui_2d_image.height = 40;
+        ui_2d_image.sourceWidth = 128;
+        ui_2d_image.sourceHeight = 128;
+        ui_2d_image.positionX = 100;
+        
+        let ui_2d_text = new UIText( ui_2d_canvas );
+        ui_2d_text.value = "0";
+        ui_2d_text.vAlign = "bottom";
+        ui_2d_text.fontSize = 18;
+        ui_2d_text.positionX =  -56;
+        ui_2d_text.positionY =  6;
+        this.uitxt_score_r = ui_2d_text;
 
 
+
+        ui_2d_text = new UIText( ui_2d_canvas );
+        ui_2d_text.value = "0";
+        ui_2d_text.vAlign = "bottom";
+        ui_2d_text.fontSize = 18;
+        ui_2d_text.positionX =  144;
+        ui_2d_text.positionY = 6;
+        this.uitxt_score_b = ui_2d_text;
+                
+        
+        ui_2d_text = new UIText( ui_2d_canvas );
+        ui_2d_text.value = "3:00";
+        ui_2d_text.vAlign = "bottom";
+        ui_2d_text.fontSize = 16;
+        ui_2d_text.positionX = 30;
+        ui_2d_text.positionY = 10;
+        this.uitxt_time = ui_2d_text;
         
 
+        ui_2d_text = new UIText( ui_2d_canvas );
+        ui_2d_text.value = "" ;
+        ui_2d_text.vAlign = "center";
+        ui_2d_text.fontSize = 16;
+        ui_2d_text.positionX = -50;
+        ui_2d_text.positionY = 40;
+        this.uitxt_instruction = ui_2d_text;
 
 
-    	/*
-		let ruler = new Entity();
-		ruler.setParent(this);
-		ruler.addComponent( new Transform( {
-			position: new Vector3(  3 , 2,  0 ),
-			scale   : new Vector3(  0.8,  1, 1.2  )
-		});
-		ruler.addComponent( new BoxShape() );
-		*/
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manacontainer );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "right";
+        ui_2d_image.width = 32;
+        ui_2d_image.height = 532;
+        ui_2d_image.sourceWidth = 64;
+        ui_2d_image.sourceHeight = 1024;
+        ui_2d_image.positionX = -16;
 
-        
+
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manabar );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "right";
+        ui_2d_image.width = 24;
+        let calc_height = this.current_mana * 478 / 100  ;
+        ui_2d_image.height = calc_height;
+        ui_2d_image.positionY = -( 256 - calc_height / 2  );
+        ui_2d_image.sourceWidth = 49;
+        ui_2d_image.sourceHeight = 956;
+        ui_2d_image.positionX = -20;
+
+        this.uiimage_manabar = ui_2d_image;
+
+         ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manalabel );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "right";
+        ui_2d_image.width = 32;
+        ui_2d_image.height = 512;
+        ui_2d_image.sourceWidth = 64;
+        ui_2d_image.sourceHeight = 1024;
+        ui_2d_image.positionX = -16;
+    }
+
+
+
+
+    //---
+    init_shared_material() {
+
         let material = new Material();
         material.albedoTexture = resources.textures.explosion;
         material.roughness = 1.0;
@@ -252,149 +1198,118 @@ export class Txstage extends Entity {
             1, 1 ,
             0, 1 ,
         ];
-        this.debug() ;
 
-		
 
-    	battleground.addComponent( 
-			new OnPointerDown((e) => {
-				_this.global_input_down( e );	
-			})
-		);
-		battleground.addComponent( 
-			new OnPointerUp((e) => {
-				_this.global_input_up( e );	
-			})
-		);
+        material = new Material();
+        material.albedoTexture = resources.textures.clock;
+        material.roughness = 1.0;
+        material.specularIntensity = 0;
+        material.transparencyMode  = 2;
+        this.shared_clock_material = material; 
+    }
 
 
 
-    }   
+
 
 
     //-------------
-    debug( ) {
+    removeClock( cl ) {
 
-        this.card_input_down( null, this.txcards[3] );
+        engine.removeEntity( this.clocks[ cl.id ] );
+        this.clocks[ cl.id ] = null ;
 
-        //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
+        
 
-        this.playerindex = -1;
-        this.createUnit( "goblin", 0,0 );
-        this.playerindex = 1;
-
-
-
-
-    }   
-
-
-    //----------------
-	step(dt:number) {
-    	
-    	this.world.Step( 0.05  , 10, 10 );
-    	
-    }
-
-
-    //--
-    update(dt) {
-    	
-
-        this.step(dt);
-    
-        let u;
-        for ( u = 0 ; u < this.units.length ; u++) {
-            let unit = this.units[u];
-            if ( unit != null  ) {
-                unit.update(dt);
-            } 
-        }
-
-        let p;
-        for ( p = 0 ; p < this.projectiles.length ; p++ ) {
-            let projectile = this.projectiles[p];
-            if ( projectile != null  ) {
-                projectile.update(dt);
+        let i;
+        for ( i =  this.clocks.length - 1 ; i >= 0 ; i-- ) {
+            // Shorten array if possible
+            if ( this.clocks[i] == null ) {
+                this.clocks.length = i;
+            } else {
+                break;
             }
         }
 
-        let exp;
-        for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
-            let explosion = this.explosions[exp];
-            if ( explosion != null && explosion.visible == 1  ) {
-                explosion.update(dt);
-            }
-        }
+        log( "clock removed ", cl.id  , this.clocks.length );
 
     }
 
+    //------------
+    getRecyclableClockIndex( ) {
 
-    global_input_down(e) {
+        let i;
+        for ( i = 0 ; i < this.clocks.length ; i++ ) {
+            if ( this.clocks[i] == null ) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
-        if ( e.buttonId == 0 ) {
 
-        	if ( e.hit ) {
+    //------------
+    getRecyclableClock( ) {
 
-				let hitEntity = engine.entities[e.hit.entityId];
-				
-				if (  hitEntity == this.battleground ) {
-					
-					let place_x = e.hit.hitPoint.x - this.transform.position.x;
-					let place_z = e.hit.hitPoint.z - this.transform.position.z;
-					
-					if ( this.card_sel_index >= 0 ) {
-						let type = this.cards_in_use[ this.card_sel_index ] ;
-						this.createUnit( type , place_x , place_z );
-										
-					}
+        return -1;
+        let i;
+        for ( i = 0 ; i < this.clocks.length ; i++ ) {
+            if ( this.clocks[i] != null  && this.clocks[i].visible == 0 ) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
-				}
-			}
+    //---------
+    createClock( location_v3  ) {
 
-        } else if ( e.buttonId == 1  ) {
-        	// E button
-        	this.playerindex = 1;
+        let clock:Txclock;
+        let recyclable_index = this.getRecyclableClock( );
 
-        } else if ( e.buttonId == 2 ) {
-        	// F button 	
-        	
-            this.playerindex = -1;
+
+        if ( recyclable_index >= 0 ) {
+
+            // Reuse entity
+            clock = this.clocks[recyclable_index];
+            clock.getComponent(Transform).position = location_v3;
+            clock.tick = clock.tick_per_frame;
+            clock.frame_index = 0;
+            clock.getComponent( PlaneShape ).uvs = clock.getUV_coord();
+
+            clock.visible = 1;
             
+            log( "clock reuse entity" , clock.id , " arr len", this.clocks.length );
 
-        }	
-     }
+        } else {
+        
+            clock = new Txclock(
+                this.clocks.length,
+                this,
+                {
+                    position: location_v3
+                },
+                this.shared_clock_material
+            ) ;
+            
+            recyclable_index = this.getRecyclableClockIndex();
 
+            if ( recyclable_index == -1 ) {
+                this.clocks.push( clock );
 
-    global_input_up(e) {
+            } else {
+                // Reuse index.
+                clock.id = recyclable_index;
+                this.clocks[recyclable_index] = clock;
+            }
 
-        if ( e.buttonId == 0 ) {
-      	}  	
-     }
+            log( "Clock " , clock.id , " inited. arr len", this.clocks.length );
+        }
 
-
-
-    //---------------------------
-    card_input_down( e, txcard ) {
-
-    	this.card_sel_highlight.getComponent(Transform).position.x = txcard.transform.position.x;
-    	this.card_sel_highlight.getComponent(Transform).position.y = txcard.transform.position.y;
-    	
-    	this.card_sel_index = this.cards_in_use.indexOf( txcard.type );
-
+       
+            
+        return clock;
     }
-
-
-
-    //---------------------------
-    card_input_up( e, type ) {
-    
-    }
-
-
-
-
-
 
 
 
@@ -449,7 +1364,7 @@ export class Txstage extends Entity {
 
 
     //---------
-    createExplosion( location_v3 , damage , owner ) {
+    createExplosion( location_v3 , damage , owner , scale_x , scale_y ) {
 
         let explosion:Txexplosion;
         let recyclable_index = this.getRecyclableExplosion( );
@@ -460,10 +1375,17 @@ export class Txstage extends Entity {
             // Reuse entity
             explosion = this.explosions[recyclable_index];
             explosion.getComponent(Transform).position = location_v3;
+            explosion.getComponent(Transform).scale.x    = scale_x ;
+            explosion.getComponent(Transform).scale.x    = scale_y ;
+                
             explosion.damage = damage;
             explosion.owner  = owner;
+            explosion.tick = explosion.tick_per_frame;
+            explosion.frame_index = 0;
+            explosion.getComponent( PlaneShape ).uvs = explosion.getUV_coord();
+
             explosion.visible = 1;
-            explosion.tick = 0;
+            
 
         } else {
         
@@ -471,7 +1393,8 @@ export class Txstage extends Entity {
                 this.explosions.length,
                 this,
                 {
-                    position: location_v3
+                    position: location_v3,
+                    scale   : new Vector3( scale_x, scale_y , 1 )
                 },
                 this.shared_explosion_material,
                 damage,
@@ -680,11 +1603,12 @@ export class Txstage extends Entity {
 
         log( "Removing unit", u.id );
 
+        this.world.DestroyBody( u.box2dbody );
         engine.removeEntity( this.units[ u.id ] );
         this.units[ u.id ] = null;
 
         let i;
-        for ( i =  this.units.length - 1 ; i >= 6 ; i-- ) {
+        for ( i =  this.units.length - 1 ; i >= 0 ; i-- ) {
             // Shorten array if possible
             if ( this.units[i] == null ) {
                 this.units.length = i;
@@ -694,6 +1618,44 @@ export class Txstage extends Entity {
         }
     }
  
+
+    //---------------------
+    spawnUnit( type , x, z ) {
+
+        if ( type == "skeleton" ) {
+            
+            this.createUnit( type, x - 0.1 , z - 0.1 );
+            this.createUnit( type, x + 0.1 , z - 0.1 );
+            this.createUnit( type, x  , z + 0.1 );
+        
+
+        } else if ( type == "archer" ) {
+
+            this.createUnit( type, x - 0.1 , z  );
+            this.createUnit( type, x + 0.1 , z  );
+                    
+
+        } else if ( type == "goblin" ) {
+        
+            this.createUnit( type, x - 0.1 , z - 0.1 );
+            this.createUnit( type, x + 0.1 , z - 0.1 );
+            this.createUnit( type, x  , z + 0.1 );
+                
+        } else if ( type == "gargoylehorde" ) {
+
+            this.createUnit( type, x - 0.1 , z - 0.1 );
+            this.createUnit( type, x + 0.1 , z - 0.1 );
+            this.createUnit( type, x - 0.1 , z + 0.1 );
+            this.createUnit( type, x + 0.1 , z + 0.1 );
+        
+        } else { 
+            this.createUnit( type, x  , z );
+        } 
+
+        this.createClock( new Vector3(x, 2.5 ,z ) );
+
+    }
+
 
 
 
@@ -850,7 +1812,7 @@ export class Txstage extends Entity {
             } else {
                 unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 0, 0, 200 );
             }
-            unit.dead = 0;
+            unit.dead = 3;
             unit.tick = 0;
             unit.attacktarget = null ;
             unit.movetarget   = null ;
@@ -922,22 +1884,81 @@ export class Txstage extends Entity {
     }
 
 
-    
+
+
+
+    //-----------------------------------------------------------
+    public all_available_cards = [ "skeleton", "giant" , "knight", "archer" , "wizard" , "goblin" , "gargoyle" , "gargoylehorde", "spell_fireball","spell_zap", "goblinhut", "tombstone", "hogrider", "prince", "goblinspear" ,"pekka" ];
+    public all_available_cards_mana = [ 15 , 60, 50, 30,  50, 30, 40, 50,  40, 20, 50,40,   40, 50, 30, 70];
 
      //----
-     random_initial_cards() {
+    init_player_cards_collection() {
 
-        this.cards_in_use.length = 0;
-        this.cards_in_use.push("skeleton");
-        this.cards_in_use.push("giant");
-        this.cards_in_use.push("knight");
-        this.cards_in_use.push("archer");
-        this.cards_in_use.push("wizard");
-        this.cards_in_use.push("goblin");
-        this.cards_in_use.push("gargoyle");
-        this.cards_in_use.push("gargoylehorde");
+        this.player_cards_collection.length = 0;
+
+        
+        let i;
+       
+        let card_sel_parent = new Entity();
+        card_sel_parent.addComponent( new Transform( {
+            position: new Vector3( -8 , 2,  -2 )
+        }));
+        card_sel_parent.setParent( this );
+        card_sel_parent.addComponent( new Billboard( false, true, false ) );
+
+        this.card_sel_parent = card_sel_parent;
+        
+
+        // So that can rotate 180 independantly of billboard
+        let card_sel_3d_ui = new Entity();
+        card_sel_3d_ui.setParent(card_sel_parent);
+        
+        let card_sel_3d_ui_transform = new Transform( {
+            position: new Vector3( 0, 0, 0 ),
+        });
+        card_sel_3d_ui.addComponent( card_sel_3d_ui_transform );  
+        card_sel_3d_ui_transform.rotation.eulerAngles = new Vector3( 0 , 180, 0 );
+
+
+        
+        // Card selected highlight 
+        let card_sel_highlight_material = new Material();
+        card_sel_highlight_material.emissiveColor = Color3.Green();
+        card_sel_highlight_material.emissiveIntensity = 3;
+        
+
+        
+        // Individual cards
+        for ( i = 0 ; i < 16 ; i++ ) {
+
+            let x = ( i % 4 ) * 1.2;
+            let y = ((i / 4)  >> 0 ) * 1.2;
+            let z = 0;
+
+            let card_type = this.all_available_cards[i];
+            let card_mana = this.all_available_cards_mana[i];
+
+            let txcard = new Txcard(
+                i ,
+                card_sel_3d_ui,
+                {
+                    position: new Vector3( x, y, z),
+                    scale   : new Vector3(1, 1, 1)
+                },
+                card_type,
+                this,
+                card_sel_highlight_material
+            );
+
+
+            txcard.manaCost = card_mana;
+            this.player_cards_collection.push( txcard );
+        }
+
+        
 
      }
+
 
 
 	//-----------------
