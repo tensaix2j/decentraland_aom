@@ -32,9 +32,12 @@ export class Txexplosion extends Entity {
 	public box2daabb: b2AABB;
 	public box2dcallback: b2QueryCallback;
 
+	public type;
+	public maxframe = 16;
+	public attackframe = 3;
 
 
-	constructor( id, parent , transform_args  , shared_material , damage , owner ) {
+	constructor( id, parent , transform_args  , shared_material , damage , owner, type ) {
 
 		super();
 		engine.addEntity(this);
@@ -44,6 +47,7 @@ export class Txexplosion extends Entity {
 		this.parent = parent;
 		this.damage = damage;
 		this.owner  = owner;
+		this.type 	= type;
 
 		this.transform =  new Transform( transform_args );
 		this.addComponent( this.transform );
@@ -53,7 +57,15 @@ export class Txexplosion extends Entity {
 		this.getComponent( PlaneShape ).uvs = this.getUV_coord();
 
 		this.visible_ypos = this.getComponent(Transform).position.y;
-		this.addComponent( new Billboard() );
+
+		if ( type == 1 ) {
+			this.addComponent( new Billboard() );
+		} else if ( type == 2 ) {
+			this.transform.rotation.eulerAngles = new Vector3( 90, 0 , 0 );
+			this.maxframe = 6;
+			this.attackframe = 0;
+		}
+		
 
 		this.tick = this.tick_per_frame;
 		this.frame_index = 0;
@@ -122,13 +134,13 @@ export class Txexplosion extends Entity {
 				this.tick -= 1;
 			} else {
 				
-				if ( this.frame_index + 1 >= 16 ) {
+				if ( this.frame_index + 1 >= this.maxframe ) {
 					
 					this.hide();
 
 				} else {
 
-					if ( this.frame_index == 3 ) {
+					if ( this.frame_index == this.attackframe ) {
 
 						this.find_nearby_units();
 						// No attack target ? look for one within aggro range. 
@@ -143,7 +155,7 @@ export class Txexplosion extends Entity {
 
 					} 
 				
-					this.frame_index = ( this.frame_index + 1 ) % 16;
+					this.frame_index = ( this.frame_index + 1 ) % this.maxframe ;
 					this.getComponent( PlaneShape ).uvs = this.getUV_coord();
 					this.tick = this.tick_per_frame;
 				}	

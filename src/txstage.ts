@@ -25,6 +25,7 @@ import { Txexplosion } from "src/txexplosion" ;
 import { Txclock } from "src/txclock";
 import { Txscoreboard } from "src/txscoreboard";
 import { Txclickable_box} from "src/txclickable_box";
+import { Txsound } from "src/txsound";
 
 
 
@@ -39,7 +40,6 @@ export class Txstage extends Entity {
 	public battleground;
 	public playerindex = 1;
 
-	public debugsetting ;
 	public card_sel_highlight;
 	public card_sel_index = 0;
 
@@ -53,6 +53,8 @@ export class Txstage extends Entity {
 
     public shared_explosion_material;
     public shared_clock_material;
+    public shared_zap_material;
+
 
 
     public uitxt_score_r ;
@@ -82,6 +84,11 @@ export class Txstage extends Entity {
 
     public animate_button_tick = 0;
     public animate_button_callback_id = "";
+
+    public sounds = {};
+
+    public debugsetting = 1;
+    public cards_dealt_in_game = 4;
 
 
 
@@ -127,18 +134,7 @@ export class Txstage extends Entity {
         this.construct_box2d_shapes();
        
     	
-    	/*
-		let ruler = new Entity();
-		ruler.setParent(this);
-		ruler.addComponent( new Transform( {
-			position: new Vector3(  3 , 2,  0 ),
-			scale   : new Vector3(  0.8,  1, 1.2  )
-		});
-		ruler.addComponent( new BoxShape() );
-		this.debug() ;
-
-        */
-
+    	
 
 
         
@@ -169,12 +165,14 @@ export class Txstage extends Entity {
         this.init_ui_2d();
         this.init_ui_3d();
         this.init_shared_material();
-
-
-         this.init_player_cards_collection();
+        this.init_sound();
+        this.init_player_cards_collection();
 
 
         this.update_button_ui();
+
+        this.debug();
+
     }   
 
 
@@ -199,17 +197,42 @@ export class Txstage extends Entity {
     //-------------
     debug( ) {
 
-        //this.card_input_down( null, this.player_cards_collection[3] );
+        if ( this.debugsetting == 1 ) {
 
-        //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
+            //this.card_input_down( null, this.player_cards_collection[3] );
 
-        //this.playerindex = -1;
-        //this.createUnit( "goblin", 0,0 );
-        //this.playerindex = 1;
+            //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
 
-       // this.createClock( new Vector3(0,2,0 ) );
+            //this.playerindex = -1;
+            //this.createUnit( "goblin", 0,0 );
+            //this.playerindex = 1;
+
+            // this.createClock( new Vector3(0,2,0 ) );
+
+            this.game_state = 1;
+
+            this.sounds["warhorn"].playOnce();
 
 
+            let i;
+            for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
+                this.player_cards_in_use.push(  this.player_cards_collection[i] );
+            }
+
+
+            this.time_remaining = 1000000;
+            
+            this.cards_dealt_in_game = 16;
+
+            this.rearrange_cards_selected();
+            this.update_button_ui();
+
+
+            //this.units[0].curhp = 1;
+
+
+        }
+           
 
     }   
 
@@ -441,8 +464,7 @@ export class Txstage extends Entity {
             }
         }
 
-        this.uitxt_instruction.value = "";
-
+        
         this.init_castles();    
         this.update_score();
 
@@ -474,34 +496,49 @@ export class Txstage extends Entity {
     					
     					if ( this.txcard_selected != null ) {
     						
-                            if ( this.placement_is_allowed( this.txcard_selected , place_x , place_z ) == 1  ) {
-                                this.current_mana -= this.txcard_selected.manaCost;
-                                this.spawnUnit( this.txcard_selected.type , place_x , place_z );
-                                this.rotate_card_in_use();
+                            if ( this.current_mana >= this.txcard_selected.manaCost || this.debugsetting == 1 ) {
+        
+                                if ( this.placement_is_allowed( this.txcard_selected , place_x , place_z ) == 1  ) {
 
+
+                                    this.current_mana -= this.txcard_selected.manaCost;
+                                    this.spawnUnit( this.txcard_selected.type , place_x , place_z );
+
+                                    if ( this.debugsetting == 0 ) {
+                                        this.rotate_card_in_use();
+                                    }
+
+                                     this.uitxt_instruction.value = "";
+
+                                } else {
+                                    this.uitxt_instruction.value = "Not allowed to place there."
+                                }
                             } else {
-                                this.uitxt_instruction.text = "Not allowed to place there."
+                                this.uitxt_instruction.value = "Not enough mana";
                             }
     								
-    					}
+    					} else {
+                            this.uitxt_instruction.value = "No card selected.";
+                        }
 
     				}
     			}
             }
 
         } else if ( e.buttonId == 1  ) {
-        	// E button
-        	//this.playerindex = 1;
-            this.current_mana += 10;
-            this.update_mana();
+        	
+
+            // E button
+        	if ( this.debugsetting == 1 ) {
+                this.playerindex = 1;
+            }
 
         } else if ( e.buttonId == 2 ) {
         	// F button 	
         	
-            //this.playerindex = -1;
-            this.current_mana -= 10;
-            this.update_mana();
-            
+            if ( this.debugsetting == 1 ) {
+                this.playerindex = -1;
+            }
         }	
      }
 
@@ -514,11 +551,9 @@ export class Txstage extends Entity {
       	
         } else if ( e.buttonId == 1 ) {
             
-            this.units[6].playAnimation("Walking", 1 );
 
         } else if ( e.buttonId == 2 ) {
 
-            this.units[7].playAnimation("Walking", 1 );
 
         }
      }
@@ -608,6 +643,7 @@ export class Txstage extends Entity {
                     this.fill_player_cards_selected();
                     this.rearrange_cards_selected(); 
                     this.game_state = 1;
+                    this.sounds["warhorn"].playOnce();
                     this.update_button_ui();
                     this.menu_labels["lbl1"].getComponent( TextShape ).value = "Battle Begins!";
                 } else {
@@ -649,7 +685,9 @@ export class Txstage extends Entity {
             }
             txcard.turnon(); 
             this.txcard_selected = txcard ;
-        }
+            this.uitxt_instruction.value = "";
+            
+        }   
 
     }
 
@@ -713,11 +751,11 @@ export class Txstage extends Entity {
         if ( this.txcard_selected != null ) {
             
             let card_selected_index = this.get_txcard_selected_index();
-            this.player_cards_in_use[card_selected_index] = this.player_cards_in_use[4];
-            this.player_cards_in_use[4] = this.player_cards_in_use[5];
-            this.player_cards_in_use[5] = this.player_cards_in_use[6];
-            this.player_cards_in_use[6] = this.player_cards_in_use[7];
-            this.player_cards_in_use[7] = this.txcard_selected;
+            this.player_cards_in_use[card_selected_index] = this.player_cards_in_use[this.cards_dealt_in_game];
+            this.player_cards_in_use[this.cards_dealt_in_game] = this.player_cards_in_use[this.cards_dealt_in_game+1];
+            this.player_cards_in_use[this.cards_dealt_in_game+1] = this.player_cards_in_use[this.cards_dealt_in_game+2];
+            this.player_cards_in_use[this.cards_dealt_in_game+2] = this.player_cards_in_use[this.cards_dealt_in_game+3];
+            this.player_cards_in_use[this.cards_dealt_in_game+3] = this.txcard_selected;
             this.txcard_selected.turnoff();
         }
         this.txcard_selected = null;
@@ -769,8 +807,9 @@ export class Txstage extends Entity {
             let txcard = this.player_cards_collection[i];
             txcard.hide();
         }
+        
 
-        for ( i = 0 ; i < 4 ; i++ ) {
+        for ( i = 0 ; i < this.cards_dealt_in_game ; i++ ) {
             
             let x = ( i % 4 ) * 1.2;
             let y = ((i / 4)  >> 0 ) * 1.2;
@@ -802,9 +841,7 @@ export class Txstage extends Entity {
     //-----------------------------------------------------
     placement_is_allowed( txcard , place_x , place_z ) {
 
-        if ( this.current_mana < txcard.manaCost ) {
-            return 0;           
-        }
+       
 
         if ( txcard.isSpell == 1  ) {
             return 1;
@@ -834,6 +871,8 @@ export class Txstage extends Entity {
 
     endgame( ) {
     
+        this.sounds["endgame"].playOnce();
+
         this.game_state = 2;
         let final_txt = "Game Over.\n";
         if ( this.score_r > this.score_b ) {
@@ -850,6 +889,7 @@ export class Txstage extends Entity {
         this.update_score();
         this.update_button_ui();
     }
+
 
 
 
@@ -895,6 +935,52 @@ export class Txstage extends Entity {
             } 
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //---------------
+    //
+    // Init section
+    //
+    //---------------
+
+
+
+
+
+
+
 
 
 
@@ -1055,10 +1141,16 @@ export class Txstage extends Entity {
                     1.5
             );
 
+            
             tower.attackRange   = 10.0;
-            tower.maxhp         = 2500;
+            
+            if ( i == 2 || i == 5 ) {
+                tower.maxhp = 5304;
+            } else {
+                tower.maxhp         = 3346;
+            }
             tower.curhp         = tower.maxhp;
-            tower.damage        = 0;
+            tower.damage        = 119;
             tower.projectile_user = 1;
 
 
@@ -1179,6 +1271,19 @@ export class Txstage extends Entity {
         material.emissiveColor = Color3.FromInts(252, 164, 23);
         this.shared_explosion_material = material;
 
+
+
+        material = new Material();
+        material.albedoTexture = resources.textures.zap;
+        material.roughness = 1.0;
+        material.specularIntensity = 0;
+        material.transparencyMode  = 2;
+        material.emissiveIntensity = 10.5;
+        material.emissiveColor = Color3.FromInts(155, 155, 255);
+        this.shared_zap_material = material;
+
+
+
         material = new Material();
         material.albedoTexture = resources.textures.fireball;
         material.roughness = 1.0;
@@ -1190,14 +1295,18 @@ export class Txstage extends Entity {
         this.shared_fireball_shape = new PlaneShape();
         this.shared_fireball_shape.uvs = [
             0, 0 ,
-            1, 0 ,
-            1, 1 ,
-            0, 1 ,
+            1/4, 0 ,
+            1/4, 1/4 ,
+            0, 1/4 ,
             0, 0 ,
-            1, 0 ,
-            1, 1 ,
-            0, 1 ,
+            1/4, 0 ,
+            1/4, 1/4 ,
+            0, 1/4 ,
         ];
+
+
+
+
 
 
         material = new Material();
@@ -1206,7 +1315,55 @@ export class Txstage extends Entity {
         material.specularIntensity = 0;
         material.transparencyMode  = 2;
         this.shared_clock_material = material; 
+
+
     }
+
+
+
+
+    init_sound( ) {
+
+        let snd ;
+        for ( snd in resources.sounds ) {
+            this.sounds[snd]     = new Txsound(this, resources.sounds[snd] );
+        }    
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1350,11 +1507,11 @@ export class Txstage extends Entity {
 
 
     //------------
-    getRecyclableExplosion( ) {
+    getRecyclableExplosion( type ) {
 
         let i;
         for ( i = 0 ; i < this.explosions.length ; i++ ) {
-            if ( this.explosions[i] != null  && this.explosions[i].visible == 0 ) {
+            if ( this.explosions[i] != null && this.explosions[i].type == type && this.explosions[i].visible == 0 ) {
                 return i;
             }
         }
@@ -1364,12 +1521,25 @@ export class Txstage extends Entity {
 
 
     //---------
-    createExplosion( location_v3 , damage , owner , scale_x , scale_y ) {
+    createExplosion( location_v3 , damage , owner ,  scale_x , scale_y , explosion_type) {
 
         let explosion:Txexplosion;
-        let recyclable_index = this.getRecyclableExplosion( );
+        let recyclable_index = this.getRecyclableExplosion( explosion_type );
+
+        let material = this.shared_explosion_material;
+
+        if ( explosion_type == 1 ) {
+            material = this.shared_explosion_material;
+            this.sounds["explosion"].playOnce();
+
+        } else if ( explosion_type == 2 ) {
+            material = this.shared_zap_material;
+            this.sounds["electricshock"].playOnce();
+
+        }
 
 
+        
         if ( recyclable_index >= 0 ) {
 
             // Reuse entity
@@ -1396,9 +1566,10 @@ export class Txstage extends Entity {
                     position: location_v3,
                     scale   : new Vector3( scale_x, scale_y , 1 )
                 },
-                this.shared_explosion_material,
+                material,
                 damage,
-                owner
+                owner,
+                explosion_type
             ) ;
             
             recyclable_index = this.getRecyclableExplosionIndex();
@@ -1489,16 +1660,23 @@ export class Txstage extends Entity {
 
         let projectile:Txprojectile;
         
-        let shape;
+        let shape ;
         if ( projectile_type == 1 ) {
-            
+
             shape = resources.models.arrow;
+            this.sounds["arrowshoot"].playOnce();
+
 
         } else if ( projectile_type == 2  ) {
 
+            shape = this.shared_fireball_shape;
+            this.sounds["whoosh"].playOnce();
+            
+        } else if ( projectile_type == 3 ) {
 
             shape = this.shared_fireball_shape;
-            
+            this.sounds["whoosh"].playOnce();
+
         }
 
 
@@ -1517,8 +1695,9 @@ export class Txstage extends Entity {
             projectile.owner  = owner;
             projectile.tick   = 0;
             projectile.visible = 1;
+            
 
-            //log("Reusing projectile" , "type", projectile.type, "id" , projectile.id , "arrlen", this.projectiles.length );
+           // log("Reusing projectile" , "type", projectile.type, "id" , projectile.id , "arrlen", this.projectiles.length );
 
         } else {
 
@@ -1534,21 +1713,43 @@ export class Txstage extends Entity {
                 owner
             );
 
-            if ( projectile_type == 2 ) {
-                projectile.getComponent( Transform ).scale.x = 0.5;
-                projectile.getComponent( Transform ).scale.y = 0.5;
+            if ( projectile_type == 1 ) {
+
+                projectile.speed = 4.5;
+
+            } else if ( projectile_type == 2 ) {
+
+                projectile.speed = 2.5;
+                projectile.getComponent( Transform ).scale.setAll(0.5);
                 projectile.addComponent( this.shared_fireball_material );
                 projectile.addComponent( new Billboard() );
+            
+            } else if ( projectile_type == 3 ) {
+                    
+                projectile.speed = 10;
+                projectile.getComponent( Transform ).scale.setAll(1.5);
+                projectile.addComponent( this.shared_fireball_material );
+                projectile.addComponent( new Billboard() );
+            
             }
+
+
 
             recyclable_index = this.getRecyclableProjectileIndex();
             if ( recyclable_index == -1 ) {    
                 this.projectiles.push( projectile );
+
+             //   log("Initing new projectile" , "type", projectile.type, "id" , projectile.id , "arrlen", this.projectiles.length );
+
             
             } else {
                 // Reuse index
                 projectile.id = recyclable_index;
                 this.projectiles[recyclable_index] = projectile 
+
+            //    log("Initing new projectile reusing index" , "type", projectile.type, "id" , projectile.id , "arrlen", this.projectiles.length );
+
+            
             }
         }
 
@@ -1607,6 +1808,7 @@ export class Txstage extends Entity {
         engine.removeEntity( this.units[ u.id ] );
         this.units[ u.id ] = null;
 
+
         let i;
         for ( i =  this.units.length - 1 ; i >= 0 ; i-- ) {
             // Shorten array if possible
@@ -1622,6 +1824,8 @@ export class Txstage extends Entity {
     //---------------------
     spawnUnit( type , x, z ) {
 
+        let spawn_clock = 1;
+
         if ( type == "skeleton" ) {
             
             this.createUnit( type, x - 0.1 , z - 0.1 );
@@ -1631,9 +1835,12 @@ export class Txstage extends Entity {
 
         } else if ( type == "archer" ) {
 
-            this.createUnit( type, x - 0.1 , z  );
-            this.createUnit( type, x + 0.1 , z  );
-                    
+            if ( this.debugsetting == 1 ) {
+                this.createUnit( type, x - 0.1 , z  );
+            } else {
+                this.createUnit( type, x - 0.1 , z  );
+                this.createUnit( type, x + 0.1 , z  );
+            }
 
         } else if ( type == "goblin" ) {
         
@@ -1647,17 +1854,65 @@ export class Txstage extends Entity {
             this.createUnit( type, x + 0.1 , z - 0.1 );
             this.createUnit( type, x - 0.1 , z + 0.1 );
             this.createUnit( type, x + 0.1 , z + 0.1 );
-        
+
+
+        } else if ( type == "spell_fireball" ) {
+            
+            spawn_clock = 0;
+            this.createProjectile(  
+                new Vector3(0,  10 , 0),
+                new Vector3(x,   2, z),
+                this.playerindex,
+                3,
+                null,
+                50
+            );
+
+        } else if ( type == "spell_zap" ) {
+            
+            spawn_clock = 0;
+            this.createExplosion( 
+                    new Vector3( x , 1.5 , z ), 
+                    5,
+                    this.playerindex, 
+                    3,
+                    3,
+                    2
+                );
+       
         } else { 
             this.createUnit( type, x  , z );
         } 
 
-        this.createClock( new Vector3(x, 2.5 ,z ) );
-
+        if ( spawn_clock == 1 ) {
+            this.createClock( new Vector3(x, 2.5 ,z ) );
+        }
     }
 
 
+    /*
+        
+                                Dmg         HP          Hitspeed  Radius
+        Skeleton                67          67            1
+        Giant                   211         3275        1.5             
+        Knight                  167         1452        1.2
+        Archer                   89         252         1.2
+        Wizard                  234         598         1.4
+        Goblin                   90         167         1.1
+        Megaminion              161         695         1.6
+        MinionHorde              84         190           1
 
+
+        Fireball                572(172)                            2.5                 
+        Zap                     159(48)                             2.5
+        Goblin Hut              
+        Tomb Stone                                  
+        Hogrider                264         1408       1.6
+        Prince                  325         1669       1.4
+        Goblin Spear             67         110        1.7
+        Pekka                   678         3125       1.8
+
+    */
 
     //---------------------
     createUnit( type , x, z) {
@@ -1694,9 +1949,11 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.skeleton;
-    		maxhp       = 120;
+
             damage      = 67;
-            attackSpeed = 20;
+            maxhp       = 67;
+            attackSpeed = 30;
+
             speed       = 5;
 
 
@@ -1707,10 +1964,16 @@ export class Txstage extends Entity {
     		modelsize 	= 0.20;
     		b2dsize  	= 0.25;
     		model 		= resources.models.giant;
-    	    maxhp       = 3200;
-            damage      = 267;
-            attackSpeed = 80;
+
+            damage      = 211;
+            maxhp       = 3275;
+            attackSpeed = 45;
+
             speed       = 5;
+
+
+
+
             healthbar_y = 4;
             attack_building_only = 1;
 
@@ -1722,10 +1985,13 @@ export class Txstage extends Entity {
     		modelsize 	= 0.18
     		b2dsize  	= 0.15;
     		model 		= resources.models.knight;
-            maxhp       = 1600;
-            damage      = 124;
-            attackSpeed = 40;
+
+            damage      = 167;
+            maxhp       = 1452;
+            attackSpeed = 36;
+
             speed       = 5;
+
 
     	
     	} else if ( type == "archer" ) {
@@ -1734,11 +2000,21 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.archer;
-            maxhp       = 450;
-            damage      = 60;
-            attackSpeed = 20;
+            
+
+            damage      = 89;
+            maxhp       = 252;
+            attackSpeed = 36;
+            
+            speed       = 5;
+
+
+
             attackRange = 3.2;
             projectile_user = 1;
+
+
+
 
     	
     	} else if ( type == "wizard" ) {
@@ -1747,24 +2023,31 @@ export class Txstage extends Entity {
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.wizard;
-    	    maxhp       = 600;
-            damage      = 124;
-            attackSpeed = 40;
+
+    	    damage      = 234;
+            maxhp       = 598;
+            attackSpeed = 42;
+            
             speed       = 5;
-            attackRange = 4.5;
+
+            attackRange = 5.0;
             projectile_user = 1;
-                
+            
+
     	
     	} else if ( type == "goblin" ) {
+
     		y 			= 1.6;
     		modelsize 	= 0.15;
     		b2dsize  	= 0.15;
     		model 		= resources.models.goblin;
     		speed 		= 5.0;
-    		maxhp       = 10067;
-    	    damage      = 99;
-            attackSpeed = 20;
-            speed       = 5;
+
+    		damage      = 90;
+            maxhp       = 167;
+            attackSpeed = 33;
+            
+            speed       = 20;
 
 
     	} else if ( type == "gargoyle" ) {
@@ -1774,11 +2057,12 @@ export class Txstage extends Entity {
     		b2dsize  	= 0.18;
     		model 		= resources.models.gargoyle;
     		isFlying    = 1;
-            maxhp       = 600;
-            damage      = 124;
-            attackSpeed = 40;
-            speed       = 5;
             
+            damage      = 161;
+            maxhp       = 695;
+            attackSpeed = 48;
+            speed       = 5;
+
 
     	} else if ( type == "gargoylehorde" ) {
     		y 			= 2.0;
@@ -1786,12 +2070,72 @@ export class Txstage extends Entity {
     		b2dsize  	= 0.12;
     		model 		= resources.models.gargoyle;
     		isFlying    = 1;
-            maxhp       = 600;
-            damage      = 124;
-            attackSpeed = 40;
-            speed       = 5;
             
-    	} 
+            damage      = 84;
+            maxhp       = 190;
+            attackSpeed = 30;
+            speed       = 5;
+
+
+            
+    	} else if ( type == "goblinspear" ) {
+            y           = 1.6;
+            modelsize   = 0.15;
+            b2dsize     = 0.15;
+            model       = resources.models.goblinspear;
+            
+            damage      = 67;
+            maxhp       = 110;
+            attackSpeed = 33;
+            speed       = 5;
+
+
+        } else if ( type == "prince" ) {
+
+            y           = 1.85;
+            modelsize   = 0.18;
+            b2dsize     = 0.15;
+            model       = resources.models.prince;
+            
+
+            damage      = 325;
+            maxhp       = 1669;
+            attackSpeed = 42;
+
+            speed       = 15;
+
+
+
+        } else if ( type == "hogrider" ) {
+
+            y           = 1.85;
+            modelsize   = 0.15;
+            b2dsize     = 0.15;
+            model       = resources.models.hogrider;
+            
+            damage      = 264;
+            maxhp       = 1408;
+            attackSpeed = 48;
+            speed       = 15;
+
+
+        } else if ( type == "pekka" ) {
+
+            y           = 1.6;
+            modelsize   = 0.15;
+            b2dsize     = 0.2;
+            model       = resources.models.pekka;
+
+            damage      = 678;
+            maxhp       = 3125;
+            attackSpeed = 54;
+            speed       = 5;
+
+        }
+
+
+
+
 
         let unit:Txunit;
         let recyclable_index = this.getRecyclableUnit( type );
@@ -1812,12 +2156,13 @@ export class Txstage extends Entity {
             } else {
                 unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 0, 0, 200 );
             }
-            unit.dead = 3;
             unit.tick = 0;
             unit.attacktarget = null ;
             unit.movetarget   = null ;
             unit.attacking    = 0;
             unit.healthbar.getComponent( Transform ).scale.x = 1.5;
+            unit.stopAnimation("Punch");
+            unit.playAnimation("Walking",1);
             unit.visible = 1;
 
 
@@ -1870,7 +2215,18 @@ export class Txstage extends Entity {
         unit.damage      = damage;
         unit.projectile_user = projectile_user;
         unit.attack_building_only = attack_building_only;
-            
+        unit.dead       = 3;
+        
+        if ( unit.owner == -1 ) {
+            unit.transform.rotation.eulerAngles = new Vector3( 0, 180 ,0) ;
+        } else {
+            unit.transform.rotation.eulerAngles = new Vector3( 0, 0 ,0) ;
+        }        
+
+        this.sounds["spawn"].playOnce();
+
+        //unit.speed = 0;
+        
 
     	if ( unit.isFlying == 1 ) {
     		categoryBits = 2;
@@ -1890,6 +2246,8 @@ export class Txstage extends Entity {
     //-----------------------------------------------------------
     public all_available_cards = [ "skeleton", "giant" , "knight", "archer" , "wizard" , "goblin" , "gargoyle" , "gargoylehorde", "spell_fireball","spell_zap", "goblinhut", "tombstone", "hogrider", "prince", "goblinspear" ,"pekka" ];
     public all_available_cards_mana = [ 15 , 60, 50, 30,  50, 30, 40, 50,  40, 20, 50,40,   40, 50, 30, 70];
+    public all_available_cards_isspell = [ 0 , 0 , 0 , 0 ,    0 , 0, 0, 0,     1 , 1 ,0, 0,    0, 0, 0, 0 ];
+
 
      //----
     init_player_cards_collection() {
@@ -1949,6 +2307,9 @@ export class Txstage extends Entity {
                 this,
                 card_sel_highlight_material
             );
+
+            txcard.isSpell = this.all_available_cards_isspell[i] ;
+
 
 
             txcard.manaCost = card_mana;

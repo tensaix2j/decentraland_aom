@@ -23,6 +23,8 @@ export class Txprojectile extends Entity {
 
 	public type;
 	public tick = 0;
+	public frame_index = 0;
+
 
 	constructor( id, parent , src_v3, dst_v3 , shape , attacktarget ,type , damage , owner ) {
 
@@ -73,24 +75,63 @@ export class Txprojectile extends Entity {
 	    	if ( this.type == 1 ) {
 	    		// Arrow
 		    	if ( this.attacktarget != null && this.attacktarget.dead == 0 ) {
-		    		this.inflict_damage();
+
+		    		this.parent.sounds["arrowhit"].playOnce();
+            		this.inflict_damage();
 		    	}
 	    	} else if ( this.type == 2 ) {
-	    		// Fireball
+	    		// Wizard Fireball
 	    		this.parent.createExplosion( 
 	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
 	    			this.damage,
 	    			this.owner, 
 	    			1,
+	    			1,
 	    			1
 	    		);
-	    	}
+	    	} else if ( this.type == 3 ) {
+	    		// Spell Fireball
+	    		this.parent.createExplosion( 
+	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
+	    			this.damage,
+	    			this.owner, 
+	    			5,
+	    			5,
+	    			1
+	    		);
+
+	    	}	
 
 
 	    	this.owner = null;
 	    	this.hide();
 
 	    }
+	}
+
+
+	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2, 3 ];
+	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 , 0 , 0 , 0 , 0];
+
+
+	//-------
+	getUV_coord() {
+
+		let frame_x = this.frame_index_to_frame_x[ this.frame_index ];
+		let frame_y = this.frame_index_to_frame_y[ this.frame_index ];
+
+		let arr = [
+			frame_x	/4				,	frame_y /4,
+			(frame_x + 1 )/4		,	frame_y /4,
+			(frame_x + 1 )/4		,	(frame_y + 1 )/4,
+			frame_x	/4				,	(frame_y + 1 )/4 ,
+			frame_x	/4				,	frame_y /4,
+			(frame_x + 1 )/4		,	frame_y /4,
+			(frame_x + 1 )/4		,	(frame_y + 1 )/4,
+			frame_x	/4				,	(frame_y + 1 )/4 
+		]
+
+		return arr;
 	}
 
 
@@ -121,6 +162,12 @@ export class Txprojectile extends Entity {
 	//----------
 	update(dt) {
 		if ( this.visible == 1 ) {
+
+			if ( this.type == 2 || this.type == 3 ) {
+				this.frame_index = ( this.frame_index + 1 ) % 16;
+				this.getComponent( PlaneShape ).uvs = this.getUV_coord();
+			}
+			
 			this.move_self(dt);
 		} else {
 			this.tick += 1;

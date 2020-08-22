@@ -50,7 +50,7 @@ export class Txunit extends Entity {
 	public damage:number;
 	public healthbar;
 
-	public dead = 0;
+	public dead = 3;
 	public tick;
 
 	public clips = {};
@@ -109,6 +109,7 @@ export class Txunit extends Entity {
 		
 		
 		this.skin_radius = box2d_transform_args.scale.x;
+		
 		this.addComponent( new Animator );
 
 		if ( this.type == "tower" ) {
@@ -189,8 +190,14 @@ export class Txunit extends Entity {
 			this.getComponent(Animator).addClip( new AnimationState("Walking") );
 			this.getComponent(Animator).addClip( new AnimationState("Punch") );
 			this.getComponent(Animator).addClip( new AnimationState("Die") );
-   		
+   			
+
+			this.stopAnimation("Punch");
+			this.playAnimation("Walking", 1 );
+   			//log( this.id , "createAnimationStates" );	
+
    		}
+
     }
 
 
@@ -291,10 +298,12 @@ export class Txunit extends Entity {
 
 	    	
 	    	} else {
+
 	    		this.walking_queue.shift();
 	    		if ( this.walking_queue.length == 0 ) {
-
-	    			this.stopAnimation("Walking");
+	    			
+	    			this.movetarget = null;
+	    			this.find_move_target();
 	    		}
 	    	}
 	    	
@@ -321,6 +330,12 @@ export class Txunit extends Entity {
 			this.dead = 1;
 			this.parent.world.DestroyBody( this.box2dbody );
 			this.parent.unit_on_die( this );
+
+			if ( this.shapetype == "static" ) {
+				this.parent.sounds["destruction"].playOnce();
+			} else {
+				this.parent.sounds["organicdie"].playOnce();
+			}
 		}
 	}
 
@@ -359,12 +374,35 @@ export class Txunit extends Entity {
 						this.attacking = 1;
 						this.tick = this.attackSpeed;
 
-						if ( this.projectile_user == 0 ) {
-							this.playAnimation("Punch", 1 );
-						}
-						
+						this.stopAnimation("Walking" );
+						this.playAnimation("Punch", 0 );
+
 						this.lookat_target( diff_x , diff_z );
+							
+					}
+
+
+					if ( this.projectile_user == 0 ) {
+						// Melee
+						if ( this.tick == 0 ) {
+
+							this.playAnimation("Punch", 0 );
 						
+						} else if ( this.tick == ( this.attackSpeed / 2 ) >> 0 ) {
+
+							if ( this.type == "knight" ) {	
+								this.parent.sounds["swordhit"].playOnce();
+							} else if ( this.type == "skeleton" ) {
+								this.parent.sounds["skeletonhit"].playOnce();	
+							
+							} else {
+								this.parent.sounds["punch"].playOnce();
+							}
+
+							// Melee
+							this.inflict_damage();
+
+						}
 					}
 
 					if ( this.tick <= 0 ) {
@@ -413,10 +451,7 @@ export class Txunit extends Entity {
 							this.lookat_target( diff_x , diff_z );
 							
 
-						} else {
-							// Melee
-							this.inflict_damage();
-						}
+						} 
 						this.tick = this.attackSpeed;
 
 					} else {
@@ -427,9 +462,15 @@ export class Txunit extends Entity {
 
 			} else {
 				// has attack target, but attack target isdead .
+
 				this.attacktarget = null;
 				this.movetarget = null;
 				this.attacking = 0;
+				if ( this.shapetype == "dynamic" ) {
+					this.stopAnimation("Punch");
+					this.playAnimation("Walking", 1 );
+				}
+
 			}
 		} else {
 			this.attacking = 0;
@@ -454,6 +495,8 @@ export class Txunit extends Entity {
 	//---
 	inflict_damage() {
 
+		//log( this.id, "inflict_damage ");
+
 		if ( this.attacktarget != null ) {
 			
 			this.attacktarget.curhp -= this.damage;
@@ -466,14 +509,15 @@ export class Txunit extends Entity {
 			this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
 			if ( this.attacktarget.curhp <= 0 ) {
 				
-
+				//log( this.id , "inflict damage, target killed.");
 				//log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );
 				this.attacktarget.die();
 				this.attacktarget = null;
-				
-
 				this.movetarget   = null;
 				this.attacking = 0;
+
+				this.stopAnimation("Punch");
+				this.playAnimation("Walking", 1 );
 
 
 			}
@@ -559,6 +603,8 @@ export class Txunit extends Entity {
 			if ( nearest_u != null ) {
 				this.attacktarget = nearest_u;
 				this.movetarget   = this.attacktarget;
+
+				log( this.id, "new target found" , this.attacktarget.id );
 				this.find_path_to_target();
 			}
 
@@ -575,6 +621,9 @@ export class Txunit extends Entity {
 		// If has no move target, then move to tower
 		if ( this.movetarget == null && this.shapetype == "dynamic" ) {
 
+
+			
+
 			let side_index = 0 ;
 			if ( this.owner == -1 ) {
 				side_index = 3;
@@ -582,7 +631,7 @@ export class Txunit extends Entity {
 
 			
 			if ( this.transform.position.x < 0 ) {
-				
+
 				if ( this.parent.units[0] && this.parent.units[0].dead == 0 ) {
 					this.movetarget = this.parent.units[0 + side_index ];
 				} else {
@@ -591,7 +640,7 @@ export class Txunit extends Entity {
 
 			} else {
 
-				if ( this.parent.units[0] && this.parent.units[0].dead == 0 ) {
+				if ( this.parent.units[1] && this.parent.units[1].dead == 0 ) {
 					this.movetarget = this.parent.units[1 + side_index];
 				} else {
 					this.movetarget = this.parent.units[2 + side_index];
@@ -605,6 +654,8 @@ export class Txunit extends Entity {
 		} else if ( this.attacktarget != null ) {
 			// has attack target, then move to attack target.
 			this.movetarget = this.attacktarget;
+		
+			
 		}
 	}
 
@@ -691,9 +742,9 @@ export class Txunit extends Entity {
     	target = this.movetarget.transform.position;
     	this.walking_queue.push( target );
 
-
-    	this.playAnimation("Walking", 1);
-
+    	// This can cause problem
+    	//this.playAnimation("Walking", 1);
+    	
 
 
     }
@@ -720,15 +771,18 @@ export class Txunit extends Entity {
     playAnimation( action_name, loop ) {
 
     	
-
+    	log( this.id, "playAnimation " , action_name , loop );
+    	
+    	/*
     	let i;
 		for ( i = 0 ; i < this.clip_names.length ; i++ ) {
 			if ( this.clip_names[i] != action_name ) {
 				this.stopAnimation( this.clip_names[i]);
 			}
 		}
+		*/
 
-
+		
 		//log( this.type , this.id , "Attempt to play" , action_name , loop );
 		let clip;
 		if ( action_name == "Punch" && this.type == "tower" ) {
@@ -741,16 +795,16 @@ export class Txunit extends Entity {
 		if ( loop == 1  ) {
     		clip.looping = true;
     	} else {
-    		clip.reset()
-			clip.looping = false;
+    		clip.looping = false;
     	}
+
     	if ( action_name == "Punch" ) {
     		clip.speed = 30.0 / this.attackSpeed ;
     	} else {
     		clip.speed = 1.0;
     	}
     	
-    	
+    	clip.reset();
 		clip.play();
 	
 		
@@ -761,10 +815,8 @@ export class Txunit extends Entity {
     	//log( this.type , this.id , "Attempt to stop" , action_name );
 
     	let clip = this.getComponent(Animator).getClip(action_name);
-
     	clip.stop();
-    	clip.reset();
-    
+    	
     }
 	
     //--

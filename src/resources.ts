@@ -2,27 +2,31 @@
 export default {
 	
 	models: {
+		
 		battleground: new GLTFShape("models/battleground.glb"),
 		tower_r: new GLTFShape("models/tower_r.glb"),
 		tower_b: new GLTFShape("models/tower_b.glb"),
+		
+
 		skeleton: new GLTFShape("models/skeleton.glb"),
 		giant: new GLTFShape("models/giant.glb"),
 		knight: new GLTFShape("models/knight.glb"),
+		archer: new GLTFShape("models/archer.glb"),
 		wizard: new GLTFShape("models/wizard.glb"),
 		goblin: new GLTFShape("models/goblin.glb"),
 		gargoyle: new GLTFShape("models/gargoyle.glb"),
-		archer: new GLTFShape("models/archer.glb"),
+		goblinspear: new GLTFShape("models/goblinspear.glb"),
+		prince: new GLTFShape("models/prince.glb"),
+		hogrider: new GLTFShape("models/hogrider.glb"),
+		pekka: new GLTFShape("models/pekka.glb"),
 		arrow: new GLTFShape("models/arrow.glb"),
 		scoreboard: new GLTFShape("models/scoreboard.glb")
 	},
 	textures: {
-		
 		skeleton: new Texture("models/skeleton_ui.png"),
 		giant: new Texture("models/giant_ui.png"),
-		
 		knight: new Texture("models/knight_ui.png"),
 		archer: new Texture("models/archer_ui.png"),
-		
 		wizard: new Texture("models/wizard_ui.png"),
 		goblin: new Texture("models/goblin_ui.png"),
 		
@@ -43,14 +47,41 @@ export default {
 
 
 		explosion: new Texture("models/explosion.png"),
+		
 		fireball: new Texture("models/fireball.png"),
+		zap: new Texture("models/zap.png"),
+
+
+
+
+
 		clock: new Texture("models/clock.png"),
 		crown_r : new Texture("models/crown_r.png"),
 		crown_b : new Texture("models/crown_b.png"),
 		manacontainer: new Texture("models/manacontainer.png"),
 		manabar: new Texture("models/manabar.png"),
-		manalabel: new Texture("models/manalabel.png")			
+		manalabel: new Texture("models/manalabel.png")
+
+
+	},
+
+	sounds: {
+		whoosh: new AudioClip("sounds/whoosh.mp3"),
+		explosion: new AudioClip("sounds/explosion.mp3"),
+		warhorn: new AudioClip("sounds/warhorn.mp3"),
+		electricshock: new AudioClip("sounds/electricshock.mp3"),
+		arrowshoot: new AudioClip("sounds/arrowshoot.mp3"),
+		arrowhit:new AudioClip("sounds/arrowhit.mp3"),
+		swordhit:new AudioClip("sounds/swordhit.mp3"),
+		organicdie: new AudioClip("sounds/organicdie.mp3"),
+		skeletonhit: new AudioClip("sounds/skeletonhit.mp3"),
+		punch: new AudioClip("sounds/punch.mp3"),
+		destruction: new AudioClip("sounds/destruction.mp3"),
+		spawn: new AudioClip("sounds/spawn.mp3"),
+		endgame:new AudioClip("sounds/endgame.mp3")
 	}
+
+
 	
 };
 
