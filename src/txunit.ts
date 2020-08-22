@@ -37,7 +37,9 @@ export class Txunit extends Entity {
 	public aggroRange = 1.5;
 	public isFlying = 0;
 	public attack_building_only = 0;
-	
+	public isSpawner = 0;
+
+
 
 	public attacking = 0;
 	public attacktarget:Txunit = null;
@@ -185,7 +187,9 @@ export class Txunit extends Entity {
 			this.getComponent(Animator).getClip("ArmatureAction").playing = true;
 			this.tower_archer.getComponent(Animator).addClip( new AnimationState("Punch") );
 			
-        } else {
+        } else if ( this.isSpawner == 0 ) {
+
+
         	this.getComponent(Animator).addClip( new AnimationState("_idle") );
 			this.getComponent(Animator).addClip( new AnimationState("Walking") );
 			this.getComponent(Animator).addClip( new AnimationState("Punch") );
@@ -214,18 +218,25 @@ export class Txunit extends Entity {
 
 				if ( this.parent.game_state == 1 ) {
 					
-					// Alive
-					this.find_attack_target();
-					this.attack_target();
-					
-					if ( this.attacking == 0 ) {
-						this.find_move_target();
-						if ( this.shapetype == "dynamic" ) {
-							this.move_self( dt );
-						}
-					}
-					this.updatePosition_toBox2d();
+					if ( this.isSpawner == 1 ) {
+						
+						this.spawn_unit();
 
+
+					} else {
+						
+						// Alive
+						this.find_attack_target();
+						this.attack_target();
+						
+						if ( this.attacking == 0 ) {
+							this.find_move_target();
+							if ( this.shapetype == "dynamic" ) {
+								this.move_self( dt );
+							}
+						}
+						this.updatePosition_toBox2d();
+					}
 				}
 			
 			} else if ( this.dead == 3 ) {
@@ -326,7 +337,11 @@ export class Txunit extends Entity {
 	    			3
 	    		);
 			} 
+			
+			this.stopAnimation("Walking");
+			this.stopAnimation("Punch");
 			this.playAnimation("Die", 0 );
+
 			this.dead = 1;
 			this.parent.world.DestroyBody( this.box2dbody );
 			this.parent.unit_on_die( this );
@@ -334,10 +349,33 @@ export class Txunit extends Entity {
 			if ( this.shapetype == "static" ) {
 				this.parent.sounds["destruction"].playOnce();
 			} else {
+				if ( this.type == "knight" || this.type == "prince" || this.type == "archer" || this.type == "wizard" || this.type == "giant" ) {
+					this.parent.sounds["scream"].playOnce();
+				}
 				this.parent.sounds["organicdie"].playOnce();
 			}
 		}
 	}
+
+
+	//-----------
+	spawn_unit() {
+
+		if ( this.tick <= 0 ) {
+			
+			this.tick = this.attackSpeed;
+			if ( this.type == "goblinhut" ) {
+				this.parent.createUnit( "goblinspear" , this.transform.position.x,  this.transform.position.z) ;
+			
+			} else if ( this.type == "tombstone" ) {
+				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z) ;
+			}
+		} else {
+			this.tick -= 1;
+		}
+						
+	}
+
 
 	//----
 	attack_target() {
@@ -373,50 +411,25 @@ export class Txunit extends Entity {
 						this.box2dbody.SetLinearVelocity( new b2Vec2(0,0) );
 						this.attacking = 1;
 						this.tick = this.attackSpeed;
+						
+							
+					}
 
-						this.stopAnimation("Walking" );
+
+					
+					// At t0
+					if ( this.tick == this.attackSpeed ) {
+
+						this.stopAnimation("Walking" );	
 						this.playAnimation("Punch", 0 );
-
 						this.lookat_target( diff_x , diff_z );
 							
-					}
-
-
-					if ( this.projectile_user == 0 ) {
-						// Melee
-						if ( this.tick == 0 ) {
-
-							this.playAnimation("Punch", 0 );
-						
-						} else if ( this.tick == ( this.attackSpeed / 2 ) >> 0 ) {
-
-							if ( this.type == "knight" ) {	
-								this.parent.sounds["swordhit"].playOnce();
-							} else if ( this.type == "skeleton" ) {
-								this.parent.sounds["skeletonhit"].playOnce();	
-							
-							} else {
-								this.parent.sounds["punch"].playOnce();
-							}
-
-							// Melee
-							this.inflict_damage();
-
-						}
-					}
-
-					if ( this.tick <= 0 ) {
-
 						// Projectile shooter
 						if ( this.projectile_user == 1 ) {
-
-								
-							this.playAnimation("Punch", 0 );
 
 							let srcx, srcy, srcz;
 
 							if ( this.type == "tower" ) {
-
 
 								srcx = this.transform.position.x + this.tower_archer.getComponent(Transform).position.x;
 								srcy = this.transform.position.y + this.tower_archer.getComponent(Transform).position.y + 0.14;
@@ -437,7 +450,6 @@ export class Txunit extends Entity {
 							if ( this.type == "wizard" ) {
 								projectile_type = 2;
 							}
-
 							this.parent.createProjectile( 
 									new Vector3( srcx, srcy, srcz) , 
 									new Vector3( dstx, dsty, dstz) , 
@@ -446,14 +458,33 @@ export class Txunit extends Entity {
 									this.attacktarget,
 									this.damage
 							);
-							
-
-							this.lookat_target( diff_x , diff_z );
-							
-
 						} 
-						this.tick = this.attackSpeed;
 
+
+					// At t 1/2
+					} else if ( this.tick == ( this.attackSpeed / 2 ) >> 0 ) {
+
+						if ( this.projectile_user == 0 ) {
+							// Melee
+							if ( this.type == "knight" || this.type == "pekka") {	
+								this.parent.sounds["swordhit"].playOnce();
+							} else if ( this.type == "skeleton" ) {
+								this.parent.sounds["skeletonhit"].playOnce();	
+							
+							} else {
+								this.parent.sounds["punch"].playOnce();
+							}
+
+							// Melee
+							this.inflict_damage();
+						}
+
+					} 
+
+
+					// At t end	
+					if ( this.tick <= 0 ) {
+						this.tick = this.attackSpeed;
 					} else {
 						this.tick -= 1;
 					}
@@ -553,12 +584,12 @@ export class Txunit extends Entity {
 
 
 	//------
-	find_nearby_units( ) {
+	find_nearby_units( search_range ) {
 		
 		
 		let _this = this;
-		this.box2daabb.lowerBound = new b2Vec2( this.transform.position.x - this.attackRange  , this.transform.position.z - this.attackRange  );
-		this.box2daabb.upperBound = new b2Vec2( this.transform.position.x + this.attackRange  , this.transform.position.z + this.attackRange  );
+		this.box2daabb.lowerBound = new b2Vec2( this.transform.position.x - search_range  , this.transform.position.z - search_range  );
+		this.box2daabb.upperBound = new b2Vec2( this.transform.position.x + search_range  , this.transform.position.z + search_range  );
 		this.units_in_proximity.length = 0;
 		this.parent.world.QueryAABB( this.box2dcallback , this.box2daabb);
 		
@@ -568,11 +599,13 @@ export class Txunit extends Entity {
 
 	//----
 	find_attack_target() {
-		
+
+
 		if ( this.attacktarget == null ) {
 			
 			//log( "units_in_proximity", this.units_in_proximity.length );	
-			this.find_nearby_units();
+			
+			this.find_nearby_units( this.aggroRange );
 			
 
 			// No attack target ? look for one within aggro range. 
@@ -585,7 +618,25 @@ export class Txunit extends Entity {
 
 				let u = this.units_in_proximity[i];
 
-				if ( u != null && u.owner != this.owner && u.dead == 0 && !(this.isFlying == 0 && u.isFlying == 1) && !( this.attack_building_only == 1 && u.shapetype == "dynamic") ) {
+				let hit_flying_unit_check = 1;
+				if ( u.isFlying == 1 ) {
+					if ( this.projectile_user == 0 ) {
+						hit_flying_unit_check = 0;	
+					}
+					if ( this.isFlying == 1 ) {
+						hit_flying_unit_check = 1;
+					}
+				}
+
+				let hit_building_check = 1;
+				if ( this.attack_building_only == 1 ) {
+					if ( u.shapetype == "dynamic" ) {
+						hit_building_check = 0;
+					}
+				}
+
+
+				if ( u != null && u.owner != this.owner && u.dead == 0 && hit_flying_unit_check == 1 &&  hit_building_check == 1 ) {
 
 					let diff_x =  u.transform.position.x - this.transform.position.x;
 					let diff_z =  u.transform.position.z - this.transform.position.z;
@@ -604,7 +655,7 @@ export class Txunit extends Entity {
 				this.attacktarget = nearest_u;
 				this.movetarget   = this.attacktarget;
 
-				log( this.id, "new target found" , this.attacktarget.id );
+				//log( this.id, "new target found" , this.attacktarget.id );
 				this.find_path_to_target();
 			}
 
@@ -632,7 +683,7 @@ export class Txunit extends Entity {
 			
 			if ( this.transform.position.x < 0 ) {
 
-				if ( this.parent.units[0] && this.parent.units[0].dead == 0 ) {
+				if ( this.parent.units[0 + side_index ] && this.parent.units[0 + side_index ].dead == 0 ) {
 					this.movetarget = this.parent.units[0 + side_index ];
 				} else {
 					this.movetarget = this.parent.units[2 + side_index];
@@ -640,7 +691,7 @@ export class Txunit extends Entity {
 
 			} else {
 
-				if ( this.parent.units[1] && this.parent.units[1].dead == 0 ) {
+				if ( this.parent.units[1 + side_index ] && this.parent.units[1 + side_index].dead == 0 ) {
 					this.movetarget = this.parent.units[1 + side_index];
 				} else {
 					this.movetarget = this.parent.units[2 + side_index];
@@ -813,8 +864,12 @@ export class Txunit extends Entity {
     stopAnimation( action_name ) {
     	
     	//log( this.type , this.id , "Attempt to stop" , action_name );
-
-    	let clip = this.getComponent(Animator).getClip(action_name);
+    	let clip;
+    	if ( action_name == "Punch" && this.type == "tower" ) {
+			clip = this.tower_archer.getComponent(Animator).getClip( action_name );
+		} else {
+			clip = this.getComponent(Animator).getClip(action_name);
+    	}
     	clip.stop();
     	
     }

@@ -19,6 +19,8 @@ export default {
 		prince: new GLTFShape("models/prince.glb"),
 		hogrider: new GLTFShape("models/hogrider.glb"),
 		pekka: new GLTFShape("models/pekka.glb"),
+		goblinhut: new GLTFShape("models/goblinhut.glb"),
+		tombstone: new GLTFShape("models/tombstone.glb"),
 		arrow: new GLTFShape("models/arrow.glb"),
 		scoreboard: new GLTFShape("models/scoreboard.glb")
 	},
@@ -29,32 +31,19 @@ export default {
 		archer: new Texture("models/archer_ui.png"),
 		wizard: new Texture("models/wizard_ui.png"),
 		goblin: new Texture("models/goblin_ui.png"),
-		
 		gargoyle: new Texture("models/gargoyle_ui.png"),
 		gargoylehorde: new Texture("models/gargoylehorde_ui.png"),
-		
 		spell_fireball: new Texture("models/spellfireball_ui.png"),
 		spell_zap	  : new Texture("models/spellzap_ui.png"),
-
 		prince: new Texture("models/prince_ui.png"),
 		hogrider: new Texture("models/hogrider_ui.png"),
-
 		goblinhut: new Texture("models/goblinhut_ui.png"),
 		goblinspear: new Texture("models/goblinspear_ui.png"),
-
 		tombstone: new Texture( "models/tombstone_ui.png"),
 		pekka: new Texture("models/pekka_ui.png"),
-
-
 		explosion: new Texture("models/explosion.png"),
-		
 		fireball: new Texture("models/fireball.png"),
 		zap: new Texture("models/zap.png"),
-
-
-
-
-
 		clock: new Texture("models/clock.png"),
 		crown_r : new Texture("models/crown_r.png"),
 		crown_b : new Texture("models/crown_b.png"),
@@ -78,7 +67,9 @@ export default {
 		punch: new AudioClip("sounds/punch.mp3"),
 		destruction: new AudioClip("sounds/destruction.mp3"),
 		spawn: new AudioClip("sounds/spawn.mp3"),
-		endgame:new AudioClip("sounds/endgame.mp3")
+		endgame:new AudioClip("sounds/endgame.mp3"),
+		scream:new AudioClip("sounds/scream.mp3"),
+		buttonclick:new AudioClip("sounds/buttonclick.mp3")
 	}
 
 

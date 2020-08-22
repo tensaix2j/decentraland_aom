@@ -208,6 +208,10 @@ export class Txstage extends Entity {
             //this.playerindex = 1;
 
             // this.createClock( new Vector3(0,2,0 ) );
+            
+
+
+
 
             this.game_state = 1;
 
@@ -229,7 +233,7 @@ export class Txstage extends Entity {
 
 
             //this.units[0].curhp = 1;
-
+            
 
         }
            
@@ -567,6 +571,9 @@ export class Txstage extends Entity {
         this.animate_button_tick = 20;
         this.animate_button_callback_id = id;
 
+        this.sounds["buttonclick"].playOnce();
+
+
    }
 
 
@@ -654,6 +661,7 @@ export class Txstage extends Entity {
 
             this.game_state = 0;
             this.menu_page = 0;
+            this.uitxt_instruction.value = "";
 
             this.reset_game();
             this.update_button_ui();
@@ -665,6 +673,8 @@ export class Txstage extends Entity {
     //---------------------------
     card_input_down( e, txcard ) {
 
+        this.sounds["buttonclick"].playOnce();
+        
         if ( this.game_state == 0 ) {
 
             if ( this.count_card_selected() >= 8 && txcard.isSelected == 0 ) {
@@ -905,12 +915,12 @@ export class Txstage extends Entity {
                 this.score_r = 3;
                 this.endgame();
                         
-            } else if ( unit.id == 4 ) {
+            } else if ( unit.id == 5 ) {
                 // Blue wins
                 this.score_b = 3;
                 this.endgame();
 
-            
+                
             } else if ( unit.id == 0 ) {
                 this.score_r += 1;
                 if ( this.sudden_death == 1 ) {
@@ -1142,17 +1152,21 @@ export class Txstage extends Entity {
             );
 
             
-            tower.attackRange   = 10.0;
+            tower.attackRange   = 12.0;
             
             if ( i == 2 || i == 5 ) {
                 tower.maxhp = 5304;
             } else {
                 tower.maxhp         = 3346;
             }
-            tower.curhp         = tower.maxhp;
-            tower.damage        = 119;
-            tower.projectile_user = 1;
-
+            tower.damage            = 119;
+            tower.projectile_user   = 1;
+            tower.attackSpeed       = 24;
+            tower.curhp             = tower.maxhp;
+            
+            tower.box2dbody.m_fixtureList.m_filter.categoryBits = 3;
+            tower.box2dbody.m_fixtureList.m_filter.maskBits     = 3;
+            
 
             this.units.push( tower );
         }
@@ -1835,19 +1849,23 @@ export class Txstage extends Entity {
 
         } else if ( type == "archer" ) {
 
-            if ( this.debugsetting == 1 ) {
-                this.createUnit( type, x - 0.1 , z  );
-            } else {
-                this.createUnit( type, x - 0.1 , z  );
-                this.createUnit( type, x + 0.1 , z  );
-            }
+            this.createUnit( type, x - 0.1 , z  );
+            this.createUnit( type, x + 0.1 , z  );
+            
 
         } else if ( type == "goblin" ) {
         
             this.createUnit( type, x - 0.1 , z - 0.1 );
             this.createUnit( type, x + 0.1 , z - 0.1 );
             this.createUnit( type, x  , z + 0.1 );
-                
+        
+        } else if ( type == "goblinspear" ) {
+        
+            this.createUnit( type, x - 0.1 , z - 0.1 );
+            this.createUnit( type, x + 0.1 , z - 0.1 );
+            this.createUnit( type, x  , z + 0.1 );
+            
+
         } else if ( type == "gargoylehorde" ) {
 
             this.createUnit( type, x - 0.1 , z - 0.1 );
@@ -1923,10 +1941,10 @@ export class Txstage extends Entity {
     	let modelsize;
     	let b2dsize;
     	let model;
-    	let attackRange = 0.3;
-    	let aggrorange  = 2.5;
+    	
         let isFlying     = 0;
-        
+        let isSpawner     = 0;
+
         let speed        = 5;
         let maxhp:number = 67;
         
@@ -1937,6 +1955,9 @@ export class Txstage extends Entity {
         let projectile_user = 0;
 
         let attack_building_only = 0;
+
+        let attackRange = 0.3;
+        let aggrorange  = 3.0;
 
 
     	// Box2d's collision grouping
@@ -1956,7 +1977,7 @@ export class Txstage extends Entity {
 
             speed       = 5;
 
-
+           
     	
     	} else if ( type == "giant" ) {
 
@@ -2010,7 +2031,7 @@ export class Txstage extends Entity {
 
 
 
-            attackRange = 3.2;
+            attackRange = 5.0;
             projectile_user = 1;
 
 
@@ -2052,7 +2073,7 @@ export class Txstage extends Entity {
 
     	} else if ( type == "gargoyle" ) {
     		
-    		y 			= 2.0;
+    		y 			= 2.5;
     		modelsize 	= 0.18;
     		b2dsize  	= 0.18;
     		model 		= resources.models.gargoyle;
@@ -2065,7 +2086,7 @@ export class Txstage extends Entity {
 
 
     	} else if ( type == "gargoylehorde" ) {
-    		y 			= 2.0;
+    		y 			= 2.5;
     		modelsize 	= 0.12;
     		b2dsize  	= 0.12;
     		model 		= resources.models.gargoyle;
@@ -2087,7 +2108,10 @@ export class Txstage extends Entity {
             damage      = 67;
             maxhp       = 110;
             attackSpeed = 33;
-            speed       = 5;
+            speed       = 20;
+
+            attackRange = 5.0;
+            projectile_user = 1;
 
 
         } else if ( type == "prince" ) {
@@ -2131,6 +2155,35 @@ export class Txstage extends Entity {
             attackSpeed = 54;
             speed       = 5;
 
+
+
+
+        } else if ( type == "tombstone" ) {
+
+            y           = 1.55;
+            modelsize   = 0.24;
+            b2dsize     = 0.24;
+            model       = resources.models.tombstone;
+
+            damage      = 0;
+            maxhp       = 422;
+            attackSpeed = 120;
+            speed       = 0;
+            isSpawner    = 1;
+
+
+         } else if ( type == "goblinhut" ) {
+
+            y           = 1.85;
+            modelsize   = 0.26;
+            b2dsize     = 0.3;
+            model       = resources.models.goblinhut;
+
+            damage      = 0;
+            maxhp       = 844;
+            attackSpeed = 135;
+            speed       = 0;
+            isSpawner    = 1;
         }
 
 
@@ -2146,8 +2199,10 @@ export class Txstage extends Entity {
             unit.transform.position = new Vector3( x, y, z );
             unit.transform.scale    = new Vector3( modelsize, modelsize, modelsize );
             unit.owner = this.playerindex;
+            
             unit.isFlying = isFlying;
             unit.aggroRange = aggrorange;
+            
             unit.reinstate_box2d( {
                 scale   : new Vector3( b2dsize , b2dsize , b2dsize )
             });
@@ -2182,7 +2237,7 @@ export class Txstage extends Entity {
                         },
                         model,
                         type,
-                        "dynamic",
+                        ( isSpawner == 1 ) ? "static" : "dynamic",
                         this.playerindex,
                         isFlying,
                         aggrorange,
@@ -2216,6 +2271,8 @@ export class Txstage extends Entity {
         unit.projectile_user = projectile_user;
         unit.attack_building_only = attack_building_only;
         unit.dead       = 3;
+        unit.isSpawner  = isSpawner;
+
         
         if ( unit.owner == -1 ) {
             unit.transform.rotation.eulerAngles = new Vector3( 0, 180 ,0) ;
