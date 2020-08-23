@@ -56,6 +56,7 @@ export class Txunit extends Entity {
 
 	public dead = 3;
 	public tick;
+	public wait_buffer;
 
 	public clips = {};
 
@@ -68,9 +69,11 @@ export class Txunit extends Entity {
 	public box2daabb: b2AABB;
 	public box2dcallback: b2QueryCallback;
 
+	public box2d_transform_args;
 
 
-	constructor( id, parent , transform_args, box2d_transform_args,  model , type, shapetype , owner, isFlying, aggroRange , healthbar_y ) {
+
+	constructor( id, parent , transform_args, box2d_transform_args,  model , type, shapetype , owner, isFlying, aggroRange , healthbar_y , wait_buffer) {
 
 		super();
 		engine.addEntity(this);
@@ -87,8 +90,8 @@ export class Txunit extends Entity {
 		this.shapetype = shapetype;
 		this.dead = 3;
 
-		this.reinstate_box2d( box2d_transform_args );
-
+		this.box2d_transform_args = box2d_transform_args;
+		
 
 		this.addComponent( this.transform );
 		this.addComponent( model );
@@ -171,7 +174,6 @@ export class Txunit extends Entity {
 		
 
 
-		this.updatePosition_toBox2d();
 		
 		 if ( this.owner == 1 ) {
         	this.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 255, 0, 0 );
@@ -182,6 +184,7 @@ export class Txunit extends Entity {
 		this.movetarget   = null ;
 		this.attacking    = 0;
 		this.tick  		  = 0;
+		this.wait_buffer  = wait_buffer;
 		this.visible_ypos = this.transform.position.y;
 		//this.getComponent(GLTFShape).visible = true;
 
@@ -267,8 +270,11 @@ export class Txunit extends Entity {
 			} else if ( this.dead == 3 ) {
 				// Booting	
 				this.tick += 1;
-				if ( this.tick >= 48 ) {
+				if ( this.tick >= this.wait_buffer ) {
+
+					this.reinstate_box2d( this.box2d_transform_args );
 					this.dead = 0;
+					this.tick = 0;
 				}
  
 			} else {
@@ -355,7 +361,7 @@ export class Txunit extends Entity {
 
 			if ( this.shapetype == "static" ) {
 
-				//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+				//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building , wait_buffer) {
 
 				this.parent.createExplosion( 
 	    			new Vector3( this.transform.position.x , this.transform.position.y, this.transform.position.z ), 
@@ -364,7 +370,8 @@ export class Txunit extends Entity {
 	    			3,    //scaley
 	    			1,    //type
 	    			0,    //dmg
-	    			0     //dmg_b
+	    			0,     //dmg_b
+	    			0  		//waitbuffer
 	    		);
 			} 
 			
@@ -395,10 +402,10 @@ export class Txunit extends Entity {
 			
 			this.tick = this.attackSpeed;
 			if ( this.type == "goblinhut" ) {
-				this.parent.createUnit( "goblinspear" , this.transform.position.x,  this.transform.position.z, this.owner ) ;
+				this.parent.createUnit( "goblinspear" , this.transform.position.x,  this.transform.position.z, this.owner , 48 ) ;
 			
 			} else if ( this.type == "tombstone" ) {
-				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z, this.owner) ;
+				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z, this.owner , 48) ;
 			}
 		} else {
 			this.tick -= 1;
@@ -492,7 +499,8 @@ export class Txunit extends Entity {
 									projectile_type,
 									this.attacktarget,
 									this.damage,
-									this.damage
+									this.damage,
+									0
 							);
 						} 
 
@@ -616,7 +624,21 @@ export class Txunit extends Entity {
 
 	    }
 	   	this.box2dbody.m_userData = this ;
-	   	
+
+
+	   	// Box2d's collision grouping
+    	let categoryBits = 1;
+    	let maskBits 	 = 1;
+
+	   	if ( this.isFlying == 1 ) {
+    		categoryBits = 2;
+    		maskBits     = 2;
+    	}
+    	this.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
+		this.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
+		
+	   	this.updatePosition_toBox2d();
+		
 	}
 
 
@@ -867,7 +889,7 @@ export class Txunit extends Entity {
     playAnimation( action_name, loop ) {
 
     	
-    	log( this.id, "playAnimation " , action_name , loop );
+    	//log( this.id, "playAnimation " , action_name , loop );
     	
     	/*
     	let i;

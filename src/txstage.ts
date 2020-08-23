@@ -26,6 +26,7 @@ import { Txclock } from "src/txclock";
 import { Txscoreboard } from "src/txscoreboard";
 import { Txclickable_box} from "src/txclickable_box";
 import { Txsound } from "src/txsound";
+import { EmitArg } from "src/txemit_args";
 
 
 
@@ -65,7 +66,6 @@ export class Txstage extends Entity {
     public score_r = 0;
     public score_b = 0;
     public time_remaining = 180;
-    public tick = 0;
     public sudden_death = 0;
 
     public buttons = {};
@@ -75,6 +75,8 @@ export class Txstage extends Entity {
     public game_state = 0;
     public menu_page  = 0;
     public menu_labels = {};
+    
+    public ui3d_root;
 
 
     public card_sel_parent ;
@@ -88,10 +90,17 @@ export class Txstage extends Entity {
     public sounds = {};
 
     public debugsetting = 0;
+
+
     public cards_dealt_in_game = 4;
 
     public scoreboard;
 
+    public tick = 0;
+    public globaltick = 0;
+
+    public messageBus       ;
+    
 
 
 	constructor( id, userID , transform_args , camera ) {
@@ -163,7 +172,7 @@ export class Txstage extends Entity {
         this.init_shared_material();
         this.init_sound();
         this.init_player_cards_collection();
-
+        this.init_MessageBus();
 
         this.update_button_ui();
 
@@ -196,25 +205,14 @@ export class Txstage extends Entity {
         if ( this.debugsetting == 1 ) {
 
             //this.card_input_down( null, this.player_cards_collection[3] );
-
             //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
-
-
-
             // this.createClock( new Vector3(0,2,0 ) );
             
-
-
-
-
             this.game_state = 1;
-
             this.sounds["warhorn"].playOnce();
-
 
             let i;
             /*
-
             for ( i = 0 ; i < 20 ; i++ ) {
                 let u = this.createUnit( "goblin", i * 0.01,  i*0.01 , -1 );
                 u.speed = 0;
@@ -312,6 +310,9 @@ export class Txstage extends Entity {
         } else {
             this.update_animate_button();
         }
+
+        this.globaltick += 1;
+
     }
 
 
@@ -410,7 +411,7 @@ export class Txstage extends Entity {
             
             } else if ( this.menu_page == 1  ) {
 
-                this.card_sel_parent.getComponent(Transform).position.y = 2;
+                this.card_sel_parent.getComponent(Transform).position.y = -2;
                 this.menu_labels["lbl1"].getComponent(TextShape).value = "Please Select 8 cards to use in battle"
                 this.buttons["confirm"].show();
                 this.buttons["cancel"].show();
@@ -433,52 +434,32 @@ export class Txstage extends Entity {
 
 
 
-    //--------------
-    reset_game() {
-        
-        this.time_remaining = 180;
-        this.sudden_death = 0;
-        this.score_r = 0;
-        this.score_b = 0;
 
-        // Clear everything.
-        let u;
-        for ( u = this.units.length ; u >= 0 ;  u--) {
-            let unit = this.units[u];
-            if ( unit != null ) {
-                this.removeUnit( unit ); 
-            }
-        }
 
-        let p;
-        for ( p = this.projectiles.length ; p >= 0 ; p-- ) {
-            let projectile = this.projectiles[p];
-            if ( projectile != null  ) {
-                this.removeProjectile( projectile );
-            }
-        }
 
-        let exp;
-        for ( exp = this.explosions.length ; exp >= 0 ; exp-- ) {
-            let explosion = this.explosions[exp];
-            if ( explosion != null  ) {
-               this.removeExplosion( explosion );
-            }
-        }
-        
-        let cl;
-        for ( cl = this.clocks.length ; cl >= 0 ; cl-- ) {
-            let clock = this.clocks[cl];
-            if ( clock != null  ) {
-                this.removeClock( clock );
-            }
-        }
 
-        
-        this.init_castles();    
-        this.update_score();
 
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -487,7 +468,7 @@ export class Txstage extends Entity {
     //         INPUTS
     //
     //---------------------------
-
+    // 
 
 
     global_input_down(e) {
@@ -503,6 +484,15 @@ export class Txstage extends Entity {
     					
     					let place_x = e.hit.hitPoint.x - this.transform.position.x;
     					let place_z = e.hit.hitPoint.z - this.transform.position.z;
+
+
+
+                        //let randnum = ( Math.random() * 200 + 50 ) >> 0;
+                        //log( "randnum" , randnum );
+                        //this.createClock( new Vector3( place_x, 2.5 , place_z ) , randnum );
+
+
+            
     					
     					if ( this.txcard_selected != null ) {
     						
@@ -512,7 +502,8 @@ export class Txstage extends Entity {
 
 
                                     this.current_mana -= this.txcard_selected.manaCost;
-                                    this.spawnUnit( this.txcard_selected.type , place_x , place_z , this.playerindex );
+                                    this.queue_command( [ "spawnUnit", this.txcard_selected.type , place_x , place_z , this.playerindex ] );
+
 
                                     if ( this.debugsetting == 0 ) {
                                         this.rotate_card_in_use();
@@ -574,11 +565,26 @@ export class Txstage extends Entity {
     txclickable_button_onclick( id , userData ) {
         
         
-        this.animate_button_tick = 20;
-        this.animate_button_callback_id = id;
+        if ( id == "confirm" && this.game_state == 0 && this.menu_page == 1 ) {
 
-        this.sounds["buttonclick"].playOnce();
+            if ( this.count_card_selected() == 8 ) {
+                
+                this.animate_button_tick = 20;
+                this.animate_button_callback_id = id;
+                this.sounds["buttonclick"].playOnce();
 
+            } else {
+                this.menu_labels["lbl1"].getComponent( TextShape ).value = "Please select exactly 8 cards";
+                this.sounds["denied"].playOnce();
+
+            }
+
+        } else {
+            this.animate_button_tick = 20;
+            this.animate_button_callback_id = id;
+            this.sounds["buttonclick"].playOnce();
+
+        }
 
    }
 
@@ -591,40 +597,13 @@ export class Txstage extends Entity {
             if ( this.animate_button_tick > 0 ) {
 
                 this.animate_button_tick -= 1;
+                this.ui3d_root.getComponent( Transform ).position.y -= 0.35;
+                        
                 
-                if ( this.animate_button_callback_id == "singleplayer" ) {
-                           
-                    this.buttons["singleplayer"].getComponent(Transform).position.y -= 0.35;
-                    this.buttons["multiplayer"].getComponent(Transform).position.y -= 0.35;
-        
-                } else if ( this.animate_button_callback_id == "cancel" || this.animate_button_callback_id == "confirm" ) {
-
-                    this.buttons["confirm"].getComponent(Transform).position.y -= 0.35;
-                    this.buttons["cancel"].getComponent(Transform).position.y -= 0.35;
-                    this.card_sel_parent.getComponent( Transform ).position.y -= 0.35;
-
-                } else if ( this.animate_button_callback_id == "leavegame" ) {
-
-                     this.buttons["leavegame"].getComponent(Transform).position.y -= 0.35;
-                }
-
             } else {
 
-                if ( this.animate_button_callback_id == "singleplayer" ) {
-                    this.buttons["singleplayer"].getComponent(Transform).position.y = 5;
-                    this.buttons["multiplayer"].getComponent(Transform).position.y  = 4;
-                
-                } else if ( this.animate_button_callback_id == "cancel" || this.animate_button_callback_id == "confirm" ) {
-
-                    this.buttons["confirm"].getComponent(Transform).position.y = 7;
-                    this.buttons["cancel"].getComponent(Transform).position.y  = 7;
-                    this.card_sel_parent.getComponent( Transform ).position.y  = 2;
-
-                } else if ( this.animate_button_callback_id == "leavegame" ) {
-
-                    this.buttons["leavegame"].getComponent(Transform).position.y = 5;
-                }
-
+                this.ui3d_root.getComponent( Transform ).position.y = 4;
+                    
 
                 this.txclickable_button_onclick_animate_done_continue( this.animate_button_callback_id );
                 this.animate_button_callback_id  = "";
@@ -746,6 +725,257 @@ export class Txstage extends Entity {
 
 
 
+
+
+
+
+
+
+
+    //---------------
+    //         MessageBus
+    //--------------
+
+    init_MessageBus() {
+
+        let _this = this;
+        this.messageBus = new MessageBus();
+        this.messageBus.on("join", (info: EmitArg) => {
+            if ( this.userID != info.userID && this.userID == info.recipient ) {
+                
+                log("bus: join", info);
+                        
+                // Somebody join me    
+                /*
+                _this.opponent = info.userID;
+                _this.emitBus.push( [ "join_resp" , info.userID ] );
+                _this.emitBus.push( [ "gametaken" ] );
+                _this.show_status_msg( _this.opponent + " joined the game you hosted.");
+                _this.page = "gameon";
+                _this.turn = this.userID;
+                _this.reset();
+                _this.refresh_gameon_page_ifneeded();
+                */
+            }
+        });
+        this.messageBus.on("join_resp", (info: EmitArg) => {
+
+            // Host resp my join
+            if ( this.userID != info.userID  && this.userID == info.recipient ) {
+                log("bus: join_resp", info );
+                /*
+                _this.opponent = info.userID;
+                _this.show_status_msg(  _this.opponent + " accepted your challenge.");
+
+                _this.isClient = 1;
+                _this.page = "gameon";
+                _this.turn = info.userID;
+                _this.reset();
+                _this.refresh_gameon_page_ifneeded();
+                */
+            }
+        });
+
+        this.messageBus.on("iamhost", (info: EmitArg) => {
+            log("buso iamhost", info );
+            if ( this.userID != info.userID ) {
+                /*
+                log("bus: iamhost", info );
+                _this.available_gamehosts[ info.userID ] = 1;
+                _this.refresh_available_games_ifneeded();
+                */
+            }
+        });
+
+        this.messageBus.on("whohost", (info: EmitArg) => {
+            if ( this.userID != info.userID ) {
+                log("bus: whohost", info );
+                /*
+                if ( _this.isHost == 1 && _this.opponent == "" ) {
+                    _this.emitBus.push( [ "iamhost" , info.userID ] );
+                }
+                */
+            }
+        });
+
+        
+
+        this.messageBus.on("gametaken", (info: EmitArg) => {
+            if ( this.userID != info.userID ) {
+                log("bus: gametaken", info );
+                /*
+                delete  _this.available_gamehosts[ info.userID ] ;
+                _this.refresh_available_games_ifneeded();
+                */
+            }
+        });
+
+        this.messageBus.on("leave", (info: EmitArg) => {
+            if ( this.userID != info.userID    && this.userID == info.recipient  ) {
+                log("bus: leave", info );
+                /*
+                _this.show_status_msg(  info.userID + " left the game. You won." );
+                _this.isHost = 0;
+                _this.isClient = 0;
+                _this.opponent = "";
+                _this.turn = this.userID;
+                _this.refresh_turn_info();
+                _this.cancelPage();
+                */
+            }
+        });
+
+        this.messageBus.on("gamecmd", (info: EmitArg) => {
+
+            log("bus: gamecmd", info );
+
+            let emit_data  = info.data;
+            if ( emit_data[0] == "spawnUnit" ) {
+
+                let spawn_absolute_tick = emit_data[5];
+                let wait_buffer         = spawn_absolute_tick - _this.globaltick;
+
+
+                if ( wait_buffer < 0 ) {
+                    // Missed out the spawn absolute tick..We are way too late
+                    wait_buffer = 0;
+                }
+                _this.spawnUnit( 
+                    emit_data[1],
+                    emit_data[2],
+                    emit_data[3],
+                    emit_data[4],
+                    wait_buffer
+                );
+            }    
+            
+        });
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //-----------
+    queue_command( cmd_arr ) {
+
+        if ( cmd_arr[0] == "spawnUnit" ) {
+
+            let spawn_absolute_tick = this.globaltick + 15;
+            cmd_arr[5] = spawn_absolute_tick ;          
+            
+            let params  = {
+                userID      : this.userID,
+                data        : cmd_arr
+            }
+            this.messageBus.emit( "gamecmd", params ); 
+        }
+    }
+
+    
+
+
+
+
+    //-------------------
+    //
+    //      Navigation
+    //
+    //-----------------------
+
+
+
+
+    //--------------
+    reset_game() {
+        
+        this.time_remaining = 180;
+        this.sudden_death = 0;
+        this.score_r = 0;
+        this.score_b = 0;
+
+        // Clear everything.
+        let u;
+        for ( u = this.units.length ; u >= 0 ;  u--) {
+            let unit = this.units[u];
+            if ( unit != null ) {
+                this.removeUnit( unit ); 
+            }
+        }
+
+        let p;
+        for ( p = this.projectiles.length ; p >= 0 ; p-- ) {
+            let projectile = this.projectiles[p];
+            if ( projectile != null  ) {
+                this.removeProjectile( projectile );
+            }
+        }
+
+        let exp;
+        for ( exp = this.explosions.length ; exp >= 0 ; exp-- ) {
+            let explosion = this.explosions[exp];
+            if ( explosion != null  ) {
+               this.removeExplosion( explosion );
+            }
+        }
+        
+        let cl;
+        for ( cl = this.clocks.length ; cl >= 0 ; cl-- ) {
+            let clock = this.clocks[cl];
+            if ( clock != null  ) {
+                this.removeClock( clock );
+            }
+        }
+
+        
+        this.init_castles();    
+        this.update_score();
+
+    }
+
+
+
+
+    endgame( ) {
+    
+        this.sounds["endgame"].playOnce();
+
+        this.game_state = 2;
+        let final_txt = "Game Over.\n";
+        if ( this.score_r > this.score_b ) {
+            final_txt += "Red Wins!";
+        } else if ( this.score_r < this.score_b ) {
+            final_txt += "Blue Wins!";
+        } else {
+            final_txt += "Draw Game";
+        }
+        final_txt += "\n\nClick Restart to play again";
+        this.uitxt_instruction.value = final_txt;
+        this.uitxt_time.value = "";
+
+        this.update_score();
+        this.update_button_ui();
+    }
+
+
+
+
+
+
+
+
+
     //---------
     get_txcard_selected_index() {
         let i;
@@ -804,7 +1034,7 @@ export class Txstage extends Entity {
         for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
             
             let txcard = this.player_cards_collection[i];
-            let x = ( i % 4 ) * 1.2;
+            let x = ( i % 4 ) * 1.2 - 2;
             let y = ((i / 4)  >> 0 ) * 1.2;
             
             txcard.reposition( x,y );
@@ -827,8 +1057,8 @@ export class Txstage extends Entity {
 
         for ( i = 0 ; i < this.cards_dealt_in_game ; i++ ) {
             
-            let x = ( i % 4 ) * 1.2;
-            let y = ((i / 4)  >> 0 ) * 1.2;
+            let x =  ( i % 4 ) * 1.2 - 2;
+            let y = ((i / 4)  >> 0 ) * 1.2 - 2;
             
             let txcard = this.player_cards_in_use[i];
             txcard.reposition( x,y );
@@ -882,32 +1112,6 @@ export class Txstage extends Entity {
         }
         return 0;
     }
-
-
-
-    endgame( ) {
-    
-        this.sounds["endgame"].playOnce();
-
-        this.game_state = 2;
-        let final_txt = "Game Over.\n";
-        if ( this.score_r > this.score_b ) {
-            final_txt += "Red Wins!";
-        } else if ( this.score_r < this.score_b ) {
-            final_txt += "Blue Wins!";
-        } else {
-            final_txt += "Draw Game";
-        }
-        final_txt += "\n\nClick Restart to play again";
-        this.uitxt_instruction.value = final_txt;
-        this.uitxt_time.value = "";
-
-        this.update_score();
-        this.update_button_ui();
-    }
-
-
-
 
 
 
@@ -985,6 +1189,17 @@ export class Txstage extends Entity {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
     //---------------
     //
     // Init section
@@ -995,6 +1210,81 @@ export class Txstage extends Entity {
 
 
 
+    //-----------------------------------------------------------
+    public all_available_cards = [ "skeleton", "giant" , "knight", "archer" , "wizard" , "goblin" , "gargoyle" , "gargoylehorde", "spell_fireball","spell_zap", "goblinhut", "tombstone", "hogrider", "prince", "goblinspear" ,"pekka" ];
+    public all_available_cards_mana = [ 15 , 60, 50, 30,  50, 30, 40, 50,  40, 20, 50,40,   40, 50, 30, 70];
+    public all_available_cards_isspell = [ 0 , 0 , 0 , 0 ,    0 , 0, 0, 0,     1 , 1 ,0, 0,    0, 0, 0, 0 ];
+
+
+     //----
+    init_player_cards_collection() {
+
+        this.player_cards_collection.length = 0;
+
+        
+        let i;
+       
+       
+        let card_sel_parent = new Entity();
+        card_sel_parent.addComponent( new Transform( {
+            position: new Vector3( 0 , 0 ,  0 )
+        }));
+        card_sel_parent.setParent( this.ui3d_root );
+       
+        this.card_sel_parent = card_sel_parent;
+        
+
+        // So that can rotate 180 independantly of billboard
+        let card_sel_3d_ui = new Entity();
+        card_sel_3d_ui.setParent(card_sel_parent);
+        
+        let card_sel_3d_ui_transform = new Transform( {
+            position: new Vector3( 0, 0, 0 ),
+        });
+        card_sel_3d_ui.addComponent( card_sel_3d_ui_transform );  
+        card_sel_3d_ui_transform.rotation.eulerAngles = new Vector3( 0 , 180, 0 );
+
+
+        
+        // Card selected highlight 
+        let card_sel_highlight_material = new Material();
+        card_sel_highlight_material.emissiveColor = Color3.Green();
+        card_sel_highlight_material.emissiveIntensity = 3;
+        
+
+        // Individual cards
+        for ( i = 0 ; i < 16 ; i++ ) {
+
+            let x = (( i % 4 ) - 2 ) * 1.2;
+            let y = ((i / 4)  >> 0 ) * 1.2;
+            let z = 0;
+
+            let card_type = this.all_available_cards[i];
+            let card_mana = this.all_available_cards_mana[i];
+
+            let txcard = new Txcard(
+                i ,
+                card_sel_3d_ui,
+                {
+                    position: new Vector3( x, y, z),
+                    scale   : new Vector3(1, 1, 1)
+                },
+                card_type,
+                this,
+                card_sel_highlight_material
+            );
+
+            txcard.isSpell = this.all_available_cards_isspell[i] ;
+
+
+
+            txcard.manaCost = card_mana;
+            this.player_cards_collection.push( txcard );
+        }
+
+        
+
+     }
 
 
 
@@ -1005,32 +1295,41 @@ export class Txstage extends Entity {
     init_ui_3d() {
 
         
+        this.ui3d_root = new Entity();
+        this.ui3d_root.setParent( this );
+        this.ui3d_root.addComponent( new Transform(
+            {   
+                position: new Vector3( -8 , 4 , 0 )
+            }
+        ) );
+        this.ui3d_root.addComponent( new Billboard() );
 
 
         this.menu_labels["lbl1"] = new Entity();
         this.menu_labels["lbl1"].addComponent( new TextShape() );
         this.menu_labels["lbl1"].addComponent( new Transform(
             {
-                position:new Vector3( -8,  6 , 4 ),
-                scale   :new Vector3( 0.2, 0.2, 0.2 )
+                position:new Vector3( 0,  4.25 , 0 ),
+                scale   :new Vector3( 0.3, 0.3, 0.3 )
             }
         ));
-        this.menu_labels["lbl1"].addComponent( new Billboard() );
         this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Black();
-        this.menu_labels["lbl1"].setParent( this );
+        this.menu_labels["lbl1"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+        this.menu_labels["lbl1"].setParent( this.ui3d_root );
 
 
         this.menu_labels["lbl2"] = new Entity();
         this.menu_labels["lbl2"].addComponent( new TextShape() );
         this.menu_labels["lbl2"].addComponent( new Transform(
             {
-                position:new Vector3( -8,  5.5 , 4 ),
-                scale   :new Vector3( 0.2, 0.2, 0.2 )
+                position:new Vector3( 0,  3.9 , 0 ),
+                scale   :new Vector3( 0.3, 0.3, 0.3 )
             }
         ));
-        this.menu_labels["lbl2"].addComponent( new Billboard() );
         this.menu_labels["lbl2"].getComponent( TextShape ).color = Color3.Black();
-        this.menu_labels["lbl2"].setParent( this );
+        this.menu_labels["lbl2"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+
+        this.menu_labels["lbl2"].setParent( this.ui3d_root );
 
 
 
@@ -1059,9 +1358,10 @@ export class Txstage extends Entity {
             "Single Player" , 
             "singleplayer",
             {
-                position: new Vector3(-8, 5,  0),
+                position: new Vector3( 0, 1,  0),
                 scale   : new Vector3(0.5,0.5,0.5)
             },
+            this.ui3d_root,
             this
         );
 
@@ -1071,9 +1371,10 @@ export class Txstage extends Entity {
             "Multi Player",
             "multiplayer", 
             {
-                 position: new Vector3(-8, 4,  0),
+                 position: new Vector3( 0, 0 ,  0),
                  scale   : new Vector3(0.5,0.5,0.5)
             },
+            this.ui3d_root,
             this
         );
 
@@ -1084,9 +1385,10 @@ export class Txstage extends Entity {
             "Confirm" , 
             "confirm",
             {
-                position: new Vector3( -8 , 7,  -1),
+                position: new Vector3( 1.5 , 3, 0),
                 scale   : new Vector3(0.5,0.5,0.5)
             },
+            this.ui3d_root,
             this
         );
         this.buttons["confirm"].hide();
@@ -1096,9 +1398,10 @@ export class Txstage extends Entity {
             "Cancel" , 
             "cancel",
             {
-                position: new Vector3( -8 , 7,  2),
+                position: new Vector3( -1.5 , 3,  0),
                 scale   : new Vector3(0.5,0.5,0.5)
             },
+           this.ui3d_root,
             this
         );
         this.buttons["cancel"].hide();
@@ -1110,9 +1413,10 @@ export class Txstage extends Entity {
             "Leave Game" ,
             "leavegame", 
             {
-                position: new Vector3(-8, 5, 0),
+                position: new Vector3( 0, 1, 0),
                 scale   : new Vector3(0.5,0.5,0.5)
             },
+            this.ui3d_root,
             this
         );
         this.buttons["leavegame"].hide();
@@ -1164,7 +1468,8 @@ export class Txstage extends Entity {
                     owner,
                     0,
                     tower_aggrorange,
-                    1.5
+                    1.5,
+                    0
             );
 
             
@@ -1395,6 +1700,11 @@ export class Txstage extends Entity {
 
 
 
+    //--------------------------
+
+    //        Game objects instantiation: Clock, Explosion, Projectiles, Unit
+
+    //--------------------------
 
 
 
@@ -1416,7 +1726,7 @@ export class Txstage extends Entity {
             }
         }
 
-        log( "clock removed ", cl.id  , this.clocks.length );
+        //log( "clock removed ", cl.id  , this.clocks.length );
 
     }
 
@@ -1447,7 +1757,7 @@ export class Txstage extends Entity {
     }
 
     //---------
-    createClock( location_v3  ) {
+    createClock( location_v3 , wait_buffer  ) {
 
         let clock:Txclock;
         let recyclable_index = this.getRecyclableClock( );
@@ -1456,15 +1766,22 @@ export class Txstage extends Entity {
         if ( recyclable_index >= 0 ) {
 
             // Reuse entity
-            clock = this.clocks[recyclable_index];
-            clock.getComponent(Transform).position = location_v3;
-            clock.tick = clock.tick_per_frame;
-            clock.frame_index = 0;
-            clock.getComponent( PlaneShape ).uvs = clock.getUV_coord();
-
-            clock.visible = 1;
+            clock                                   = this.clocks[recyclable_index];
+            clock.getComponent(Transform).position  = location_v3;
+            clock.tick                              = 0;
+            clock.endtick                           = wait_buffer;
             
-            log( "clock reuse entity" , clock.id , " arr len", this.clocks.length );
+            clock.frame_index                       = 0;
+            clock.frame_tick                        = 0;
+            clock.frame_tick_per_frame              = ( wait_buffer / 16 ) >> 0;
+            if ( clock.frame_tick_per_frame < 1 ) {
+                clock.frame_tick_per_frame = 1;
+            }
+
+            clock.getComponent( PlaneShape ).uvs    = clock.getUV_coord();
+            clock.visible                           = 1;
+            
+            //log( "clock reuse entity" , clock.id , " arr len", this.clocks.length );
 
         } else {
         
@@ -1474,7 +1791,8 @@ export class Txstage extends Entity {
                 {
                     position: location_v3
                 },
-                this.shared_clock_material
+                this.shared_clock_material,
+                wait_buffer
             ) ;
             
             recyclable_index = this.getRecyclableClockIndex();
@@ -1488,7 +1806,7 @@ export class Txstage extends Entity {
                 this.clocks[recyclable_index] = clock;
             }
 
-            log( "Clock " , clock.id , " inited. arr len", this.clocks.length );
+           // log( "Clock " , clock.id , " inited. arr len", this.clocks.length );
         }
 
        
@@ -1549,7 +1867,7 @@ export class Txstage extends Entity {
 
 
     //---------
-    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building , wait_buffer ) {
 
         let explosion:Txexplosion;
         let recyclable_index = this.getRecyclableExplosion( explosion_type );
@@ -1558,12 +1876,10 @@ export class Txstage extends Entity {
 
         if ( explosion_type == 1 ) {
             material = this.shared_explosion_material;
-            this.sounds["explosion"].playOnce();
-
+            
         } else if ( explosion_type == 2 ) {
             material = this.shared_zap_material;
-            this.sounds["electricshock"].playOnce();
-
+            
         }
 
 
@@ -1580,7 +1896,6 @@ export class Txstage extends Entity {
             explosion.owner  = owner;
             explosion.tick = explosion.tick_per_frame;
             explosion.frame_index = 0;
-            explosion.getComponent( PlaneShape ).uvs = explosion.getUV_coord();
 
             explosion.visible = 1;
             
@@ -1614,6 +1929,10 @@ export class Txstage extends Entity {
                 this.explosions[recyclable_index] = explosion;
             }
         }
+
+        explosion.dead = 3;
+        explosion.wait_buffer = wait_buffer;
+        explosion.getComponent( PlaneShape ).uvs = explosion.getUV_coord();
 
         
        // log( "Explosion " , explosion.id , " inited. arr len", this.explosions.length );
@@ -1687,7 +2006,7 @@ export class Txstage extends Entity {
 
 
     //------------
-    createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building ) {
+    createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building , wait_buffer ) {
 
 
         let projectile:Txprojectile;
@@ -1696,19 +2015,16 @@ export class Txstage extends Entity {
         if ( projectile_type == 1 ) {
 
             shape = resources.models.arrow;
-            this.sounds["arrowshoot"].playOnce();
-
-
+            
         } else if ( projectile_type == 2  ) {
 
             shape = this.shared_fireball_shape;
-            this.sounds["whoosh"].playOnce();
             
+
         } else if ( projectile_type == 3 ) {
 
             shape = this.shared_fireball_shape;
-            this.sounds["whoosh"].playOnce();
-
+            
         }
 
 
@@ -1768,8 +2084,7 @@ export class Txstage extends Entity {
                 projectile.addComponent( new Billboard() );
             
             }
-
-
+            
 
             recyclable_index = this.getRecyclableProjectileIndex();
             if ( recyclable_index == -1 ) {    
@@ -1787,6 +2102,12 @@ export class Txstage extends Entity {
 
             
             }
+        }
+
+        projectile.dead = 3;
+        projectile.wait_buffer = wait_buffer;
+        if ( projectile_type == 2 || projectile_type == 3 ) {
+            projectile.getComponent( PlaneShape ).uvs = projectile.getUV_coord();
         }
 
         //log( "Projectile " , "type:", projectile.type, "id:", projectile.id , " inited. arr len", this.projectiles.length );
@@ -1858,47 +2179,50 @@ export class Txstage extends Entity {
  
 
     //---------------------
-    spawnUnit( type , x, z , owner ) {
+    spawnUnit( type , x, z , owner , wait_buffer ) {
 
-        let spawn_clock = 1;
+
+
+
+        this.createClock( new Vector3(x, 2.5 ,z ) , wait_buffer );
+                
 
         if ( type == "skeleton" ) {
             
-            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x  , z + 0.1 , owner);
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x       , z + 0.1 , owner, wait_buffer );
         
 
         } else if ( type == "archer" ) {
 
-            this.createUnit( type, x - 0.1 , z  , owner);
-            this.createUnit( type, x + 0.1 , z  , owner);
+            this.createUnit( type, x - 0.1 , z  , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z  , owner, wait_buffer );
             
 
         } else if ( type == "goblin" ) {
         
-            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x  , z + 0.1 , owner);
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x  , z + 0.1 , owner, wait_buffer );
         
         } else if ( type == "goblinspear" ) {
         
-            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x  , z + 0.1 , owner);
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x  , z + 0.1 , owner, wait_buffer );
             
 
         } else if ( type == "gargoylehorde" ) {
 
-            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
-            this.createUnit( type, x - 0.1 , z + 0.1 , owner);
-            this.createUnit( type, x + 0.1 , z + 0.1 , owner);
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner, wait_buffer );
+            this.createUnit( type, x - 0.1 , z + 0.1 , owner, wait_buffer );
+            this.createUnit( type, x + 0.1 , z + 0.1 , owner, wait_buffer );
 
 
         } else if ( type == "spell_fireball" ) {
             
-            spawn_clock = 0;
             // createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building ) {
 
             this.createProjectile(  
@@ -1908,14 +2232,12 @@ export class Txstage extends Entity {
                 3,
                 null,
                 572,
-                172
+                172,
+                wait_buffer
             );
 
         } else if ( type == "spell_zap" ) {
             
-            spawn_clock = 0;
-            //createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
-
             this.createExplosion( 
                     new Vector3( x , 1.5 , z ), 
                     owner, 
@@ -1923,17 +2245,16 @@ export class Txstage extends Entity {
                     3,
                     2,
                     159,
-                    48
+                    48,
+                    wait_buffer
                 );
 
        
         } else { 
-            this.createUnit( type, x  , z , owner);
+            this.createUnit( type, x  , z , owner, wait_buffer );
         } 
 
-        if ( spawn_clock == 1 ) {
-            this.createClock( new Vector3(x, 2.5 ,z ) );
-        }
+        
     }
 
 
@@ -1962,9 +2283,9 @@ export class Txstage extends Entity {
     */
 
     //---------------------
-    createUnit( type , x, z , owner ) {
+    createUnit( type , x, z , owner, wait_buffer  ) {
 
-    	log( "createUnit" , type, x, z , owner);
+    	log( "createUnit" , type, owner, "wait for", wait_buffer, "gtick", this.globaltick );
 
     	let y ;
     	let modelsize;
@@ -1989,10 +2310,7 @@ export class Txstage extends Entity {
         let aggrorange  = 3.0;
 
 
-    	// Box2d's collision grouping
-    	let categoryBits = 1;
-    	let maskBits 	 = 1;
-
+    	
 
     	if ( type == "skeleton" ) {
     		y 			= 1.6;
@@ -2113,7 +2431,8 @@ export class Txstage extends Entity {
             attackSpeed = 48;
             speed       = 5;
 
-
+            this.sounds["gargoyle"].playOnce();
+            
     	} else if ( type == "gargoylehorde" ) {
     		y 			= 2.5;
     		modelsize 	= 0.12;
@@ -2126,7 +2445,8 @@ export class Txstage extends Entity {
             attackSpeed = 30;
             speed       = 5;
 
-
+            this.sounds["gargoyle"].playOnce();
+            
             
     	} else if ( type == "goblinspear" ) {
             y           = 1.6;
@@ -2157,6 +2477,8 @@ export class Txstage extends Entity {
 
             speed       = 15;
 
+            this.sounds["horse"].playOnce();
+
 
 
         } else if ( type == "hogrider" ) {
@@ -2170,6 +2492,9 @@ export class Txstage extends Entity {
             maxhp       = 1408;
             attackSpeed = 48;
             speed       = 15;
+
+            this.sounds["pig"].playOnce();
+            
 
 
         } else if ( type == "pekka" ) {
@@ -2231,16 +2556,15 @@ export class Txstage extends Entity {
             
             unit.isFlying = isFlying;
             unit.aggroRange = aggrorange;
-            
-            unit.reinstate_box2d( {
-                scale   : new Vector3( b2dsize , b2dsize , b2dsize )
-            });
+                
             if ( unit.owner == 1 ) {
                 unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 255, 0, 0 );
             } else {
                 unit.healthbar.getComponent( Material ).albedoColor = Color3.FromInts( 0, 0, 200 );
             }
             unit.tick = 0;
+            unit.wait_buffer = wait_buffer;
+            unit.dead = 3;
             unit.attacktarget = null ;
             unit.movetarget   = null ;
             unit.attacking    = 0;
@@ -2250,7 +2574,8 @@ export class Txstage extends Entity {
             unit.visible = 1;
 
 
-            log( "reuse unit entity " , unit.type, unit.id , " inited. arr len", this.units.length );
+
+            //log( "reuse unit entity " , unit.type, unit.id , " inited. arr len", this.units.length );
 
         } else {
 
@@ -2270,7 +2595,8 @@ export class Txstage extends Entity {
                         owner,
                         isFlying,
                         aggrorange,
-                        healthbar_y
+                        healthbar_y,
+                        wait_buffer
                     );
 
             
@@ -2283,7 +2609,7 @@ export class Txstage extends Entity {
                 this.units[recyclable_index] = unit;
             }	
         
-            log( "Unit " , unit.type, unit.id , " inited. arr len", this.units.length );
+           // log( "Unit " , unit.type, unit.id , " inited. arr len", this.units.length );
         
         }
 
@@ -2313,14 +2639,7 @@ export class Txstage extends Entity {
 
         //unit.speed = 0;
         
-
-    	if ( unit.isFlying == 1 ) {
-    		categoryBits = 2;
-    		maskBits     = 2;
-    	}
-    	unit.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
-		unit.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
-
+    	
 		
     	return unit;
     }
@@ -2329,83 +2648,38 @@ export class Txstage extends Entity {
 
 
 
-    //-----------------------------------------------------------
-    public all_available_cards = [ "skeleton", "giant" , "knight", "archer" , "wizard" , "goblin" , "gargoyle" , "gargoylehorde", "spell_fireball","spell_zap", "goblinhut", "tombstone", "hogrider", "prince", "goblinspear" ,"pekka" ];
-    public all_available_cards_mana = [ 15 , 60, 50, 30,  50, 30, 40, 50,  40, 20, 50,40,   40, 50, 30, 70];
-    public all_available_cards_isspell = [ 0 , 0 , 0 , 0 ,    0 , 0, 0, 0,     1 , 1 ,0, 0,    0, 0, 0, 0 ];
-
-
-     //----
-    init_player_cards_collection() {
-
-        this.player_cards_collection.length = 0;
-
-        
-        let i;
-       
-        let card_sel_parent = new Entity();
-        card_sel_parent.addComponent( new Transform( {
-            position: new Vector3( -8 , 2,  -2 )
-        }));
-        card_sel_parent.setParent( this );
-        card_sel_parent.addComponent( new Billboard( false, true, false ) );
-
-        this.card_sel_parent = card_sel_parent;
-        
-
-        // So that can rotate 180 independantly of billboard
-        let card_sel_3d_ui = new Entity();
-        card_sel_3d_ui.setParent(card_sel_parent);
-        
-        let card_sel_3d_ui_transform = new Transform( {
-            position: new Vector3( 0, 0, 0 ),
-        });
-        card_sel_3d_ui.addComponent( card_sel_3d_ui_transform );  
-        card_sel_3d_ui_transform.rotation.eulerAngles = new Vector3( 0 , 180, 0 );
-
-
-        
-        // Card selected highlight 
-        let card_sel_highlight_material = new Material();
-        card_sel_highlight_material.emissiveColor = Color3.Green();
-        card_sel_highlight_material.emissiveIntensity = 3;
-        
-
-        
-        // Individual cards
-        for ( i = 0 ; i < 16 ; i++ ) {
-
-            let x = ( i % 4 ) * 1.2;
-            let y = ((i / 4)  >> 0 ) * 1.2;
-            let z = 0;
-
-            let card_type = this.all_available_cards[i];
-            let card_mana = this.all_available_cards_mana[i];
-
-            let txcard = new Txcard(
-                i ,
-                card_sel_3d_ui,
-                {
-                    position: new Vector3( x, y, z),
-                    scale   : new Vector3(1, 1, 1)
-                },
-                card_type,
-                this,
-                card_sel_highlight_material
-            );
-
-            txcard.isSpell = this.all_available_cards_isspell[i] ;
 
 
 
-            txcard.manaCost = card_mana;
-            this.player_cards_collection.push( txcard );
-        }
 
-        
 
-     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //--------------------------
+    //
+    //      Box2D Section
+    //
+    //--------------------------
 
 
 	//-----------------

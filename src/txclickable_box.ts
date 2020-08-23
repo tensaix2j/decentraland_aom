@@ -20,7 +20,8 @@ export class Txclickable_box extends Entity {
 			lbl:string,
 			id:string,
 			transform_args: TranformConstructorArgs,
-			parent
+			parent,
+			stage
 	) {
 
 		super();
@@ -32,7 +33,6 @@ export class Txclickable_box extends Entity {
 		this.setParent( parent );
 		
 		this.addComponent( this.transform );
-		this.addComponent( new Billboard() );
 		engine.addEntity( this );
 					
 
@@ -50,7 +50,7 @@ export class Txclickable_box extends Entity {
 		box_entity.addComponent( box_material );
 		box_entity.addComponent( new OnPointerDown(
 			(e) => {
-				parent.txclickable_button_onclick( this.id , this.userData );
+				stage.txclickable_button_onclick( this.id , this.userData );
 			},
 			{
 			   	distance: 28

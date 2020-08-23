@@ -40,7 +40,8 @@ export class Txexplosion extends Entity {
 	public maxframe = 16;
 	public attackframe = 3;
 
-
+	public dead = 3;
+	public wait_buffer = 0;
 
 	constructor( id, parent , transform_args  , shared_material , owner, type,  damage ,  damage_building ) {
 
@@ -75,7 +76,7 @@ export class Txexplosion extends Entity {
 		}
 		
 
-		this.tick = this.tick_per_frame;
+		this.tick = 0;
 		this.frame_index = 0;
 
 		let _this = this;
@@ -93,7 +94,7 @@ export class Txexplosion extends Entity {
 	}
 
 
-	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2, 3 ];
+	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2,  3 ];
 	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 , 0 , 0 , 0 , 0];
 
 
@@ -102,6 +103,11 @@ export class Txexplosion extends Entity {
 
 		let frame_x = this.frame_index_to_frame_x[ this.frame_index ];
 		let frame_y = this.frame_index_to_frame_y[ this.frame_index ];
+
+		if ( this.dead == 3 ) {
+			frame_x = 5;
+			frame_y = 5;
+		}
 
 		let arr = [
 			frame_x	/4				,	frame_y /4,
@@ -138,43 +144,60 @@ export class Txexplosion extends Entity {
 
 		if ( this.visible == 1 ) {
 			
-			if ( this.tick > 0 ) {
-				this.tick -= 1;
-			} else {
-				
-				if ( this.frame_index + 1 >= this.maxframe ) {
-					
-					this.hide();
+			if ( this.dead == 0 ) {
 
+				if ( this.tick < this.tick_per_frame ) {
+					this.tick += 1;
 				} else {
+					
+					if ( this.frame_index + 1 >= this.maxframe ) {
+						
+						this.hide();
 
-					if ( this.frame_index == this.attackframe ) {
+					} else {
 
-						this.find_nearby_units();
-						// No attack target ? look for one within aggro range. 
-						let i;
-						for ( i = 0 ; i < this.units_in_proximity.length ; i++ ) {
+						if ( this.frame_index == this.attackframe ) {
 
-							let u = this.units_in_proximity[i];
-							
-							if ( u != null && u.dead == 0 && u.owner != this.owner ) {
+							this.find_nearby_units();
+							// No attack target ? look for one within aggro range. 
+							let i;
+							for ( i = 0 ; i < this.units_in_proximity.length ; i++ ) {
+
+								let u = this.units_in_proximity[i];
 								
-								let diff_x = u.transform.position.x - this.transform.position.x;
-								let diff_z = u.transform.position.z - this.transform.position.z;
+								if ( u != null && u.dead == 0 && u.owner != this.owner ) {
+									
+									let diff_x = u.transform.position.x - this.transform.position.x;
+									let diff_z = u.transform.position.z - this.transform.position.z;
 
-								let hypsqr = diff_x * diff_x + diff_z * diff_z;
-								if ( hypsqr <= this.transform.scale.x * this.transform.scale.x ) {
-									this.inflict_damage( u );
-								}	
+									let hypsqr = diff_x * diff_x + diff_z * diff_z;
+									if ( hypsqr <= this.transform.scale.x * this.transform.scale.x ) {
+										this.inflict_damage( u );
+									}	
+								}
 							}
-						}
 
-					} 
-				
-					this.frame_index = ( this.frame_index + 1 ) % this.maxframe ;
-					this.getComponent( PlaneShape ).uvs = this.getUV_coord();
-					this.tick = this.tick_per_frame;
-				}	
+						} 
+					
+						this.frame_index = ( this.frame_index + 1 ) % this.maxframe ;
+						this.getComponent( PlaneShape ).uvs = this.getUV_coord();
+						this.tick = 0;
+					}	
+				}
+
+			} else if ( this.dead == 3 ) {
+				// Booting	
+				this.tick += 1;
+				if ( this.tick >= this.wait_buffer ) {
+
+					if ( this.type == 1 ) {
+						this.parent.sounds["explosion"].playOnce();
+					} else if ( this.type == 2 ) {
+						this.parent.sounds["electricshock"].playOnce();
+					}
+					this.dead = 0;
+					this.tick = 0;
+				}
 			}
 
 		} else {
@@ -210,7 +233,7 @@ export class Txexplosion extends Entity {
 			}
 			//log( this.type, this.id , "hits " , this.attacktarget.type, this.attacktarget.id , " remaining hp = " , this.attacktarget.curhp , this.attacktarget.maxhp )
 			attacktarget.refresh_hp();
-			
+
 			if ( attacktarget.curhp <= 0 ) {
 				
 				//log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );

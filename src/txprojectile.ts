@@ -28,6 +28,10 @@ export class Txprojectile extends Entity {
 	public tick = 0;
 	public frame_index = 0;
 
+	public dead = 3;
+	public wait_buffer = 0;
+
+
 
 	constructor( id, parent , shape, src_v3, dst_v3  , owner,  type, attacktarget ,  damage , damage_building ) {
 
@@ -88,7 +92,7 @@ export class Txprojectile extends Entity {
 	    	} else if ( this.type == 2 ) {
 	    		// Wizard Fireball
 
-	    		//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+	    		//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building , wait_buffer ) {
 
 	    		this.parent.createExplosion( 
 	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
@@ -98,6 +102,7 @@ export class Txprojectile extends Entity {
 	    			1,
 	    			this.damage,
 	    			this.damage_building,
+	    			0
 	    		);
 	    	} else if ( this.type == 3 ) {
 	    		// Spell Fireball
@@ -109,6 +114,7 @@ export class Txprojectile extends Entity {
 	    			1,
 	    			this.damage,
 	    			this.damage_building,
+	    			0
 	    		);
 
 	    	}	
@@ -130,6 +136,11 @@ export class Txprojectile extends Entity {
 
 		let frame_x = this.frame_index_to_frame_x[ this.frame_index ];
 		let frame_y = this.frame_index_to_frame_y[ this.frame_index ];
+
+		if ( this.dead == 3 ) {
+			frame_x = 5;
+			frame_y = 5;
+		}
 
 		let arr = [
 			frame_x	/4				,	frame_y /4,
@@ -173,12 +184,30 @@ export class Txprojectile extends Entity {
 	update(dt) {
 		if ( this.visible == 1 ) {
 
-			if ( this.type == 2 || this.type == 3 ) {
-				this.frame_index = ( this.frame_index + 1 ) % 16;
-				this.getComponent( PlaneShape ).uvs = this.getUV_coord();
-			}
+			if ( this.dead == 0 ) {
+				if ( this.type == 2 || this.type == 3 ) {
+					this.frame_index = ( this.frame_index + 1 ) % 16;
+					this.getComponent( PlaneShape ).uvs = this.getUV_coord();
+				}
+				this.move_self(dt);
 			
-			this.move_self(dt);
+			
+			} else if ( this.dead == 3 ) {
+				
+				// Booting	
+				this.tick += 1;
+				if ( this.tick >= this.wait_buffer ) {
+					this.dead = 0;
+					this.tick = 0;
+					
+					if ( this.type == 1 ) {
+						this.parent.sounds["arrowshoot"].playOnce();
+					} else if ( this.type == 2 || this.type == 3 ) {
+						this.parent.sounds["whoosh"].playOnce();
+            		}
+
+				}
+ 			}
 		} else {
 			this.tick += 1;
 			if ( this.tick > 100 ) {

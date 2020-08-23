@@ -15,12 +15,18 @@ export class Txclock extends Entity {
 	public transform;
 	public visible = 1;
 
-	public frame_index = 0;
+	
+
 	public tick = 0;
-	public tick_per_frame = 3;
+	public endtick = 0;
 
 
-	constructor( id, parent , transform_args  , shared_material   ) {
+	public frame_index = 0;
+	public frame_tick  = 0;
+	public frame_tick_per_frame = 3;
+	
+
+	constructor( id, parent , transform_args  , shared_material , endtick  ) {
 
 		super();
 		engine.addEntity(this);
@@ -41,14 +47,24 @@ export class Txclock extends Entity {
 		this.getComponent( PlaneShape ).uvs = this.getUV_coord();
 		this.addComponent( new Billboard() );
 
-		this.tick = this.tick_per_frame;
-		this.frame_index = 0;
+		this.tick 			= 0;
+		this.endtick 		= endtick;
+		
+
+
+		this.frame_index 	= 0;
+		this.frame_tick 	= 0;
+		this.frame_tick_per_frame = ( endtick / 16 ) >> 0;
+
+		if ( this.frame_tick_per_frame < 1 ) {
+			this.frame_tick_per_frame = 1;
+		}
 
 	}
 
 
-	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 , 0 , 1, 2, 3 ];
-	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 , 0 , 0 , 0, 0 ];
+	public frame_index_to_frame_x = [ 0 , 1, 2, 3,    0, 1, 2, 3,   0, 1, 2, 3 ,    0 , 1, 2, 3 ];
+	public frame_index_to_frame_y = [ 3 , 3, 3, 3,    2, 2, 2, 2,   1, 1, 1, 1 ,    0 , 0 , 0, 0 ];
 
 
 	//-------
@@ -79,25 +95,23 @@ export class Txclock extends Entity {
 
 		if ( this.visible == 1 ) {
 			
-			if ( this.tick > 0 ) {
+			// Run from 0 to endtick
+			if ( this.tick < this.endtick ) {
 
-				this.tick -= 1;
+				this.tick += 1;
 				
-				
-
-			} else {
-				
-				
-				if ( this.frame_index + 1 >= 12 ) {
-						
-					this.hide();
-
-				} else { 
-
-					this.frame_index = ( this.frame_index + 1 ) % 16;
+				if ( this.frame_tick < this.frame_tick_per_frame ) {	
+					this.frame_tick += 1;
+				} else {
+					// While adding tick, animate timer also..				
+					this.frame_index = this.frame_index + 1;	
 					this.getComponent( PlaneShape ).uvs = this.getUV_coord();
-					this.tick = this.tick_per_frame;
+					this.frame_tick = 0;
 				}
+				
+			} else {
+				// Reaches endtick, hide..
+				this.hide();
 			}
 
 		} else {

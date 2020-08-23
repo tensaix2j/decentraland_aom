@@ -69,7 +69,11 @@ export default {
 		spawn: new AudioClip("sounds/spawn.mp3"),
 		endgame:new AudioClip("sounds/endgame.mp3"),
 		scream:new AudioClip("sounds/scream.mp3"),
-		buttonclick:new AudioClip("sounds/buttonclick.mp3")
+		buttonclick:new AudioClip("sounds/buttonclick.mp3"),
+		denied: new AudioClip("sounds/denied.mp3"),
+		horse: new AudioClip("sounds/horse.mp3"),
+		gargoyle: new AudioClip("sounds/gargoyle.mp3"),
+		pig: new AudioClip("sounds/pig.mp3")
 	}
 
 
