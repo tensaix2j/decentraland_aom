@@ -18,7 +18,10 @@ export class Txprojectile extends Entity {
 	public speed = 2.5;
 
 	public attacktarget;
+	
 	public damage;
+	public damage_building;
+
 	public owner;
 
 	public type;
@@ -26,7 +29,7 @@ export class Txprojectile extends Entity {
 	public frame_index = 0;
 
 
-	constructor( id, parent , src_v3, dst_v3 , shape , attacktarget ,type , damage , owner ) {
+	constructor( id, parent , shape, src_v3, dst_v3  , owner,  type, attacktarget ,  damage , damage_building ) {
 
 		super();
 		engine.addEntity(this);
@@ -36,7 +39,10 @@ export class Txprojectile extends Entity {
 		this.parent = parent;
 		this.type = type;
 		this.attacktarget = attacktarget;
+		
 		this.damage = damage;
+		this.damage_building = damage_building;
+
 		this.owner  = owner;
 
 		this.dst_v3 = dst_v3;
@@ -81,23 +87,28 @@ export class Txprojectile extends Entity {
 		    	}
 	    	} else if ( this.type == 2 ) {
 	    		// Wizard Fireball
+
+	    		//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+
 	    		this.parent.createExplosion( 
 	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
-	    			this.damage,
 	    			this.owner, 
 	    			1,
 	    			1,
-	    			1
+	    			1,
+	    			this.damage,
+	    			this.damage_building,
 	    		);
 	    	} else if ( this.type == 3 ) {
 	    		// Spell Fireball
 	    		this.parent.createExplosion( 
 	    			new Vector3( transform.position.x , transform.position.y, transform.position.z ), 
-	    			this.damage,
 	    			this.owner, 
 	    			5,
 	    			5,
-	    			1
+	    			1,
+	    			this.damage,
+	    			this.damage_building,
 	    		);
 
 	    	}	
@@ -146,9 +157,8 @@ export class Txprojectile extends Entity {
 				this.attacktarget.curhp = 0;
 			}
 			//log( this.type, this.id , "hits " , this.attacktarget.type, this.attacktarget.id , " remaining hp = " , this.attacktarget.curhp , this.attacktarget.maxhp )
+			this.attacktarget.refresh_hp();
 
-			let hp_perc = this.attacktarget.curhp / this.attacktarget.maxhp ;
-			this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
 			if ( this.attacktarget.curhp <= 0 ) {
 				
 				//log( this.type, this.id , " kills " , this.attacktarget.type, this.attacktarget.id );

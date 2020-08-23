@@ -87,8 +87,10 @@ export class Txstage extends Entity {
 
     public sounds = {};
 
-    public debugsetting = 1;
+    public debugsetting = 0;
     public cards_dealt_in_game = 4;
+
+    public scoreboard;
 
 
 
@@ -152,13 +154,7 @@ export class Txstage extends Entity {
 		);
 
 
-        let scoreboard = new Txscoreboard(
-            0,
-            this,
-            {
-                position: new Vector3(0,8,0)
-            }
-        )
+       
 
 
         this.init_castles();
@@ -203,9 +199,7 @@ export class Txstage extends Entity {
 
             //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
 
-            //this.playerindex = -1;
-            //this.createUnit( "goblin", 0,0 );
-            //this.playerindex = 1;
+
 
             // this.createClock( new Vector3(0,2,0 ) );
             
@@ -219,6 +213,15 @@ export class Txstage extends Entity {
 
 
             let i;
+            /*
+
+            for ( i = 0 ; i < 20 ; i++ ) {
+                let u = this.createUnit( "goblin", i * 0.01,  i*0.01 , -1 );
+                u.speed = 0;
+            }
+            */
+
+
             for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
                 this.player_cards_in_use.push(  this.player_cards_collection[i] );
             }
@@ -330,6 +333,9 @@ export class Txstage extends Entity {
     update_score() {
         this.uitxt_score_r.value = this.score_r ;
         this.uitxt_score_b.value = this.score_b ;
+        this.scoreboard.refresh_score( this.score_r , this.score_b );
+
+
     }
 
     update_time() {
@@ -506,7 +512,7 @@ export class Txstage extends Entity {
 
 
                                     this.current_mana -= this.txcard_selected.manaCost;
-                                    this.spawnUnit( this.txcard_selected.type , place_x , place_z );
+                                    this.spawnUnit( this.txcard_selected.type , place_x , place_z , this.playerindex );
 
                                     if ( this.debugsetting == 0 ) {
                                         this.rotate_card_in_use();
@@ -1028,6 +1034,16 @@ export class Txstage extends Entity {
 
 
 
+        this.scoreboard = new Txscoreboard(
+            0,
+            this,
+            {
+                position: new Vector3(0,8,0)
+            }
+        )
+
+
+
         this.init_buttons();
     }   
 
@@ -1155,7 +1171,7 @@ export class Txstage extends Entity {
             tower.attackRange   = 12.0;
             
             if ( i == 2 || i == 5 ) {
-                tower.maxhp = 5304;
+                tower.maxhp         = 5304;
             } else {
                 tower.maxhp         = 3346;
             }
@@ -1164,9 +1180,7 @@ export class Txstage extends Entity {
             tower.attackSpeed       = 24;
             tower.curhp             = tower.maxhp;
             
-            tower.box2dbody.m_fixtureList.m_filter.categoryBits = 3;
-            tower.box2dbody.m_fixtureList.m_filter.maskBits     = 3;
-            
+
 
             this.units.push( tower );
         }
@@ -1535,7 +1549,7 @@ export class Txstage extends Entity {
 
 
     //---------
-    createExplosion( location_v3 , damage , owner ,  scale_x , scale_y , explosion_type) {
+    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
 
         let explosion:Txexplosion;
         let recyclable_index = this.getRecyclableExplosion( explosion_type );
@@ -1572,7 +1586,9 @@ export class Txstage extends Entity {
             
 
         } else {
-        
+            
+            // constructor( id, parent , transform_args  , shared_material , owner, type,  damage ,  damage_building ) 
+
             explosion = new Txexplosion(
                 this.explosions.length,
                 this,
@@ -1581,9 +1597,10 @@ export class Txstage extends Entity {
                     scale   : new Vector3( scale_x, scale_y , 1 )
                 },
                 material,
-                damage,
                 owner,
-                explosion_type
+                explosion_type,
+                damage,
+                damage_building
             ) ;
             
             recyclable_index = this.getRecyclableExplosionIndex();
@@ -1598,6 +1615,7 @@ export class Txstage extends Entity {
             }
         }
 
+        
        // log( "Explosion " , explosion.id , " inited. arr len", this.explosions.length );
             
         return explosion;
@@ -1669,7 +1687,7 @@ export class Txstage extends Entity {
 
 
     //------------
-    createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage ) {
+    createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building ) {
 
 
         let projectile:Txprojectile;
@@ -1706,6 +1724,7 @@ export class Txstage extends Entity {
             projectile.attacktarget = attacktarget;
             projectile_type = projectile_type;
             projectile.damage = damage;
+            projectile.damage_building = damage_building;
             projectile.owner  = owner;
             projectile.tick   = 0;
             projectile.visible = 1;
@@ -1715,16 +1734,19 @@ export class Txstage extends Entity {
 
         } else {
 
+            //  constructor( id, parent , shape, src_v3, dst_v3  , owner,  type, attacktarget ,  damage , damage_building ) {
+
             projectile = new Txprojectile(
                 this.projectiles.length,
                 this,
+                shape,
                 src_v3, 
                 dst_v3,
-                shape,
-                attacktarget,
+                owner,
                 projectile_type,
+                attacktarget,
                 damage,
-                owner
+                damage_building,
             );
 
             if ( projectile_type == 1 ) {
@@ -1836,70 +1858,77 @@ export class Txstage extends Entity {
  
 
     //---------------------
-    spawnUnit( type , x, z ) {
+    spawnUnit( type , x, z , owner ) {
 
         let spawn_clock = 1;
 
         if ( type == "skeleton" ) {
             
-            this.createUnit( type, x - 0.1 , z - 0.1 );
-            this.createUnit( type, x + 0.1 , z - 0.1 );
-            this.createUnit( type, x  , z + 0.1 );
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x  , z + 0.1 , owner);
         
 
         } else if ( type == "archer" ) {
 
-            this.createUnit( type, x - 0.1 , z  );
-            this.createUnit( type, x + 0.1 , z  );
+            this.createUnit( type, x - 0.1 , z  , owner);
+            this.createUnit( type, x + 0.1 , z  , owner);
             
 
         } else if ( type == "goblin" ) {
         
-            this.createUnit( type, x - 0.1 , z - 0.1 );
-            this.createUnit( type, x + 0.1 , z - 0.1 );
-            this.createUnit( type, x  , z + 0.1 );
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x  , z + 0.1 , owner);
         
         } else if ( type == "goblinspear" ) {
         
-            this.createUnit( type, x - 0.1 , z - 0.1 );
-            this.createUnit( type, x + 0.1 , z - 0.1 );
-            this.createUnit( type, x  , z + 0.1 );
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x  , z + 0.1 , owner);
             
 
         } else if ( type == "gargoylehorde" ) {
 
-            this.createUnit( type, x - 0.1 , z - 0.1 );
-            this.createUnit( type, x + 0.1 , z - 0.1 );
-            this.createUnit( type, x - 0.1 , z + 0.1 );
-            this.createUnit( type, x + 0.1 , z + 0.1 );
+            this.createUnit( type, x - 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x + 0.1 , z - 0.1 , owner);
+            this.createUnit( type, x - 0.1 , z + 0.1 , owner);
+            this.createUnit( type, x + 0.1 , z + 0.1 , owner);
 
 
         } else if ( type == "spell_fireball" ) {
             
             spawn_clock = 0;
+            // createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building ) {
+
             this.createProjectile(  
                 new Vector3(0,  10 , 0),
                 new Vector3(x,   2, z),
-                this.playerindex,
+                owner,
                 3,
                 null,
-                50
+                572,
+                172
             );
 
         } else if ( type == "spell_zap" ) {
             
             spawn_clock = 0;
+            //createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+
             this.createExplosion( 
                     new Vector3( x , 1.5 , z ), 
-                    5,
-                    this.playerindex, 
+                    owner, 
                     3,
                     3,
-                    2
+                    2,
+                    159,
+                    48
                 );
+
        
         } else { 
-            this.createUnit( type, x  , z );
+            this.createUnit( type, x  , z , owner);
         } 
 
         if ( spawn_clock == 1 ) {
@@ -1933,9 +1962,9 @@ export class Txstage extends Entity {
     */
 
     //---------------------
-    createUnit( type , x, z) {
+    createUnit( type , x, z , owner ) {
 
-    	log( "createUnit" , type, x, z );
+    	log( "createUnit" , type, x, z , owner);
 
     	let y ;
     	let modelsize;
@@ -2198,7 +2227,7 @@ export class Txstage extends Entity {
             unit = this.units[recyclable_index];
             unit.transform.position = new Vector3( x, y, z );
             unit.transform.scale    = new Vector3( modelsize, modelsize, modelsize );
-            unit.owner = this.playerindex;
+            unit.owner = owner;
             
             unit.isFlying = isFlying;
             unit.aggroRange = aggrorange;
@@ -2238,7 +2267,7 @@ export class Txstage extends Entity {
                         model,
                         type,
                         ( isSpawner == 1 ) ? "static" : "dynamic",
-                        this.playerindex,
+                        owner,
                         isFlying,
                         aggrorange,
                         healthbar_y

@@ -50,7 +50,9 @@ export class Txunit extends Entity {
 	public maxhp:number;
 
 	public damage:number;
+	
 	public healthbar;
+	public healthbarnumber;
 
 	public dead = 3;
 	public tick;
@@ -101,7 +103,7 @@ export class Txunit extends Entity {
 		healthbar.addComponent( new PlaneShape() );
 		healthbar.addComponent( new Transform({
 			position: new Vector3(  0,    healthbar_y,   0),
-			scale   : new Vector3(1.5,   0.2,   1)
+			scale   : new Vector3(1.5,   0.2,   0.2)
 		}));
 		healthbar.addComponent( new Billboard() );
 		healthbar.addComponent( healthbar_material );
@@ -140,6 +142,16 @@ export class Txunit extends Entity {
 			if ( this.owner == -1 ) {
 				this.tower_archer.getComponent(Transform).rotation.eulerAngles = new Vector3( 0 , 180 , 0 );
 			}
+
+			let healthbarnumber = new Entity();
+			healthbarnumber.setParent( this );
+			healthbarnumber.addComponent( new TextShape() );
+			healthbarnumber.addComponent( new Transform( {
+				position: new Vector3( 0 , healthbar_y  , 0.1 * this.owner ),
+				scale : new Vector3( 0.15, 0.15, 0.15)
+			}));
+			healthbarnumber.addComponent(new Billboard() );
+			this.healthbarnumber = healthbarnumber;
 		}
 
 		
@@ -204,6 +216,19 @@ export class Txunit extends Entity {
 
     }
 
+
+
+    //----------
+    refresh_hp() {
+    	
+    	let hp_perc = this.curhp / this.maxhp ;
+		this.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
+		
+		if ( this.type == "tower" ) {
+			this.healthbarnumber.getComponent(TextShape).value = this.curhp + "" ;
+		}	
+
+    }
 
 	
 
@@ -329,12 +354,17 @@ export class Txunit extends Entity {
 		if ( this.parent.game_state == 1 ) {
 
 			if ( this.shapetype == "static" ) {
+
+				//    createExplosion( location_v3 ,  owner ,  scale_x , scale_y , explosion_type, damage , damage_building ) {
+
 				this.parent.createExplosion( 
 	    			new Vector3( this.transform.position.x , this.transform.position.y, this.transform.position.z ), 
-	    			0,
 	    			this.owner,
-	    			3,
-	    			3
+	    			3,    //scalex
+	    			3,    //scaley
+	    			1,    //type
+	    			0,    //dmg
+	    			0     //dmg_b
 	    		);
 			} 
 			
@@ -365,10 +395,10 @@ export class Txunit extends Entity {
 			
 			this.tick = this.attackSpeed;
 			if ( this.type == "goblinhut" ) {
-				this.parent.createUnit( "goblinspear" , this.transform.position.x,  this.transform.position.z) ;
+				this.parent.createUnit( "goblinspear" , this.transform.position.x,  this.transform.position.z, this.owner ) ;
 			
 			} else if ( this.type == "tombstone" ) {
-				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z) ;
+				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z, this.owner) ;
 			}
 		} else {
 			this.tick -= 1;
@@ -450,12 +480,18 @@ export class Txunit extends Entity {
 							if ( this.type == "wizard" ) {
 								projectile_type = 2;
 							}
+
+
+
+							//createProjectile( src_v3, dst_v3 , owner , projectile_type , attacktarget, damage , damage_building ) {
+
 							this.parent.createProjectile( 
 									new Vector3( srcx, srcy, srcz) , 
 									new Vector3( dstx, dsty, dstz) , 
 									this.owner, 
 									projectile_type,
 									this.attacktarget,
+									this.damage,
 									this.damage
 							);
 						} 
@@ -536,8 +572,9 @@ export class Txunit extends Entity {
 			}
 			//log( this.type, this.id , "hits " , this.attacktarget.type, this.attacktarget.id , " remaining hp = " , this.attacktarget.curhp , this.attacktarget.maxhp )
 
-			let hp_perc = this.attacktarget.curhp / this.attacktarget.maxhp ;
-			this.attacktarget.healthbar.getComponent( Transform ).scale.x = hp_perc * 1.5;
+				
+			this.attacktarget.refresh_hp();
+
 			if ( this.attacktarget.curhp <= 0 ) {
 				
 				//log( this.id , "inflict damage, target killed.");
@@ -724,24 +761,32 @@ export class Txunit extends Entity {
 
     	if ( this.isFlying == 0 && ( this.owner == 1 && this.movetarget.transform.position.z > 0  || this.owner == -1 && this.movetarget.transform.position.z < 0 ) ) {
 
-	    	// Walk around own castle 
+	    	// Walk around own middle castle 
 	    	if (  (  ( this.owner == 1 && this.transform.position.z < -6.7 )  ||  ( this.owner == -1 && this.transform.position.z > 6.7 )  )   && this.transform.position.x > -1 && this.transform.position.x < 1 ) {
 	    		
 	    		target = new Vector3(0,0,0);
-	    		target.z = -6.7 * this.owner;
+	    		target.z = -1.5 * this.owner;
+
 	    		if ( this.transform.position.x < 0 ) {
-		    		target.x = -2;
+		    		target.x = -3;
 		    	} else {
-		    		target.x = 2;
+		    		target.x = 3;
 		    	}
+
 		    	this.walking_queue.push( target );
 			
+
+
+
+
+
+		    // Walk around own side castle
 			} else if (  ( this.owner == 1 && this.transform.position.z < -4.55 ) ||  ( this.owner == -1 && this.transform.position.z > 4.55) ) {
 
 				target = new Vector3(0,0,0);
-	    		target.position.z = -5.00 * this.owner;
+	    		target.z = -1.5 * this.owner;
 	    		
-				if ( this.transform.position.x < 0 ) {
+	    		if ( this.transform.position.x < 0 ) {
 					if ( this.transform.position.x < -3  ) {
 						target.x = -4;
 					} else {
