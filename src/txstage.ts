@@ -27,7 +27,7 @@ import { Txscoreboard } from "src/txscoreboard";
 import { Txclickable_box} from "src/txclickable_box";
 import { Txsound } from "src/txsound";
 import { EmitArg } from "src/txemit_args";
-
+import { TxAIBot } from "src/txaibot";
 
 
 export class Txstage extends Entity {
@@ -65,6 +65,8 @@ export class Txstage extends Entity {
     public uitxt_mana;
     public uiimg_selected_card;
     public uitxt_selected_card_mana;
+    public uiimg_redflag;
+    public uiimg_blueflag;
 
 
     public score_r = 0;
@@ -77,8 +79,12 @@ export class Txstage extends Entity {
     public uiimage_manabar ;
 
     public game_state = 0;
+    public game_mode  = 0;
+        
+
     public menu_page  = 0;
     public menu_labels = {};
+
     
     public ui3d_root;
 
@@ -90,11 +96,12 @@ export class Txstage extends Entity {
 
     public animate_button_tick = 0;
     public animate_button_callback_id = "";
+    public animate_button_userdata = "";
+
 
     public sounds = {};
 
-    public debugsetting = 0;
-
+   
 
     public cards_dealt_in_game = 4;
 
@@ -103,8 +110,25 @@ export class Txstage extends Entity {
     public tick = 0;
     public globaltick = 0;
 
-    public messageBus       ;
+    public aibot ;
+
     
+
+
+
+    public messageBus ;
+    public emitBus      = [];
+    public isHost       = 0;
+    public isClient     = 0;
+    public opponent     = "";
+    public available_gamehosts = {}    
+
+
+
+
+
+    public debugsetting = 0;
+
 
 
 	constructor( id, userID , transform_args , camera ) {
@@ -177,7 +201,7 @@ export class Txstage extends Entity {
         this.init_sound();
         this.init_player_cards_collection();
         this.init_MessageBus();
-
+        this.init_aibot();
         this.update_button_ui();
 
         this.debug();
@@ -212,7 +236,8 @@ export class Txstage extends Entity {
             //this.createExplosion( new Vector3(0,2,0) , 1 , 1 );
             // this.createClock( new Vector3(0,2,0 ) );
             
-            this.game_state = 1;
+            
+            this.sounds["medieval"].stop();
             this.sounds["warhorn"].playOnce();
 
             let i;
@@ -222,20 +247,31 @@ export class Txstage extends Entity {
                 u.speed = 0;
             }
             */
+            /*
+            let u = this.createUnit( "goblin",  3 ,  -4 , -1, 0 );
+            u.curhp = 100000;
+            u.maxhp = 100000;
+            u.speed = 0;
 
+            this.units[4].curhp = 1000000;
+            this.units[4].maxhp = 1000000;
+            */
 
             for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
                 this.player_cards_in_use.push(  this.player_cards_collection[i] );
             }
 
-
             this.time_remaining = 1000000;
-            
             this.cards_dealt_in_game = 16;
-
             this.rearrange_cards_selected();
             this.update_button_ui();
 
+
+            this.game_state = 2;
+            this.score_b = 2;
+            this.score_r = 2;
+
+            this.endgame();
 
             //this.units[0].curhp = 1;
             
@@ -270,52 +306,86 @@ export class Txstage extends Entity {
 
 
     //--
+    // Bookmark update()
+
     update(dt) {
     	
+            
+
+        if ( this.game_state == 1 || this.game_state == 2 ) {
+    
+            this.step(dt);
+            
+            let u;
+            for ( u = 0 ; u < this.units.length ; u++) {
+                let unit = this.units[u];
+                if ( unit != null  ) {
+                    unit.update(dt);
+                } 
+            }
+
+            let p;
+            for ( p = 0 ; p < this.projectiles.length ; p++ ) {
+                let projectile = this.projectiles[p];
+                if ( projectile != null  ) {
+                    projectile.update(dt);
+                }
+            }
+
+            let exp;
+            for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
+                let explosion = this.explosions[exp];
+                if ( explosion != null  ) {
+                    explosion.update(dt);
+                }
+            }
+             
+
+            let cl;
+            for ( cl = 0 ; cl < this.clocks.length ; cl++ ) {
+                let clock = this.clocks[cl];
+                if ( clock != null  ) {
+                    clock.update(dt);
+                }
+            }
+
         
-        this.step(dt);
-        let u;
-        for ( u = 0 ; u < this.units.length ; u++) {
-            let unit = this.units[u];
-            if ( unit != null  ) {
-                unit.update(dt);
-            } 
-        }
 
-        let p;
-        for ( p = 0 ; p < this.projectiles.length ; p++ ) {
-            let projectile = this.projectiles[p];
-            if ( projectile != null  ) {
-                projectile.update(dt);
-            }
-        }
-
-        let exp;
-        for ( exp = 0 ; exp < this.explosions.length ; exp++ ) {
-            let explosion = this.explosions[exp];
-            if ( explosion != null  ) {
-                explosion.update(dt);
-            }
-        }
-         
-
-        let cl;
-        for ( cl = 0 ; cl < this.clocks.length ; cl++ ) {
-            let clock = this.clocks[cl];
-            if ( clock != null  ) {
-                clock.update(dt);
-            }
-        }
-
-        if ( this.game_state == 1 ) {
             this.update_mana();
             this.update_score();
             this.update_time();
-        } else {
-            this.update_animate_button();
-        }
+            
+            if ( this.game_mode == 1 && this.game_state == 1  ) {
+                this.aibot.update();
+            }
+
+        } 
+             
+
+
+        this.update_animate_button();
+        
 
         this.globaltick += 1;
+
+        
+        // Emit here, not in onData of messageBus
+        if ( this.emitBus.length > 0 ) {
+
+            let msg = this.emitBus.shift();
+            let params  = {
+                userID      : this.userID,
+            }
+            if ( msg.length >= 2 ) {
+                params["recipient"] = msg[1];
+            }
+            if ( msg.length >= 3 ) {
+                params["data"] = msg[2];
+            }
+            this.messageBus.emit( msg[0], params );
+        }
+
+            
 
     }
 
@@ -397,6 +467,8 @@ export class Txstage extends Entity {
 
 
     //------------------------------------
+    // Bookmark update_button_ui
+
     update_button_ui( ) {
 
         let b;
@@ -411,6 +483,11 @@ export class Txstage extends Entity {
         
         if ( this.game_state == 0 ) { 
 
+            this.uiimg_redflag.visible = false;
+            this.uiimg_blueflag.visible = false;
+            this.uiimg_selected_card.visible = false;
+
+
             if  ( this.menu_page == 0 ) {
             
                 this.buttons["singleplayer"].show();
@@ -423,12 +500,42 @@ export class Txstage extends Entity {
                 this.buttons["confirm"].show();
                 this.buttons["cancel"].show();
                 
-            }   
+            }  else if ( this.menu_page == 2 ) {
+
+                // For battle starting.
+            }  else if ( this.menu_page == 3 ) {
+
+                this.menu_labels["lbl1"].getComponent(TextShape).value = "Host or Join Game."
+                
+                this.buttons["cancel"].show();
+                this.buttons["hostgame"].show();
+                
+                // Multiplayer page 
+                this.refresh_available_games_ifneeded();
+
+
+
+
+
+            } else if ( this.menu_page == 4 ) {
+
+                this.menu_labels["lbl1"].getComponent(TextShape).value = "Waiting for others to join....."
+                this.buttons["cancel"].show();
+
+            } else if ( this.menu_page == 5 ) {
+
+                this.menu_labels["lbl1"].getComponent(TextShape).value = "Joining the host..."
+                this.buttons["cancel"].show();
+    
+            }
 
         } else if ( this.game_state == 1 ) {
 
+            this.uiimg_redflag.visible = false;
+            this.uiimg_blueflag.visible = false;
+            
             this.card_sel_parent.getComponent(Transform).position.y = 2;
-
+             this.buttons["leavegame"].show();
 
 
         } else if ( this.game_state == 2 ) {
@@ -447,7 +554,31 @@ export class Txstage extends Entity {
 
 
 
+    //------------------------------------
+    refresh_available_games_ifneeded() {
 
+        if ( this.game_state == 0 && this.menu_page == 3 ) {
+
+            let i;
+            for ( i = 0 ; i < 5 ; i++ ) {
+                 this.buttons["playButton" + i ].hide();
+            }
+            let hostid ;
+            i = 0;
+            for ( hostid in this.available_gamehosts ) {
+
+                if ( i >= 5 ) {
+                    break;
+                }
+
+                this.buttons["playButton" + i ].show();
+                this.buttons["playButton" + i ].text_shape.value = hostid;
+                this.buttons["playButton" + i ].userData = hostid;
+                i += 1;
+                
+            }
+        }
+    }
 
 
 
@@ -520,13 +651,19 @@ export class Txstage extends Entity {
 
                                 } else {
                                     this.uitxt_instruction.value = "Not allowed to place there."
+                                    this.sounds["denied"].playOnce();
+
                                 }
                             } else {
                                 this.uitxt_instruction.value = "Not enough mana";
+                                this.sounds["denied"].playOnce();
+
                             }
     								
     					} else {
                             this.uitxt_instruction.value = "No card selected.";
+                            this.sounds["denied"].playOnce();
+
                         }
 
     				}
@@ -571,7 +708,7 @@ export class Txstage extends Entity {
     //------------------
     txclickable_button_onclick( id , userData ) {
         
-        
+
         if ( id == "confirm" && this.game_state == 0 && this.menu_page == 1 ) {
 
             if ( this.count_card_selected() == 8 ) {
@@ -585,10 +722,12 @@ export class Txstage extends Entity {
                 this.sounds["denied"].playOnce();
 
             }
-
+        
         } else {
+
             this.animate_button_tick = 20;
             this.animate_button_callback_id = id;
+            this.animate_button_userdata = userData;
             this.sounds["buttonclick"].playOnce();
 
         }
@@ -600,20 +739,45 @@ export class Txstage extends Entity {
    update_animate_button() {
         
         if ( this.animate_button_callback_id != "" ) {
-   
+            
+
             if ( this.animate_button_tick > 0 ) {
 
-                this.animate_button_tick -= 1;
-                this.ui3d_root.getComponent( Transform ).position.y -= 0.35;
+                if ( this.animate_button_callback_id == "battlebegin" ) {
                         
-                
+                    let animate_delta = 40 - this.animate_button_tick;
+                    this.uiimg_redflag.positionX   = -100 + animate_delta * 40;
+                    this.uiimg_blueflag.positionX  =  100 - animate_delta * 40;
+                    this.uitxt_instruction.fontSize = 80 - animate_delta  * 2 ;
+                         
+                } else {
+                    this.ui3d_root.getComponent( Transform ).position.y -= 0.35;
+                }
+
+                this.animate_button_tick -= 1;
+                 
             } else {
 
-                this.ui3d_root.getComponent( Transform ).position.y = 4;
+                if ( this.animate_button_callback_id == "battlebegin" ) {
                     
+                    this.uiimg_redflag.visible = false;
+                    this.uiimg_blueflag.visible = false;
+                    this.uiimg_redflag.positionX   = -100;
+                    this.uiimg_blueflag.positionX  =  100;
+                    this.uitxt_instruction.fontSize = 16;
+                    this.uitxt_instruction.value = "";
 
-                this.txclickable_button_onclick_animate_done_continue( this.animate_button_callback_id );
+                } else {
+                    this.ui3d_root.getComponent( Transform ).position.y = 4;
+                }
+
+                let use_id = this.animate_button_callback_id;
+                let userData = this.animate_button_userdata;
+
                 this.animate_button_callback_id  = "";
+                this.animate_button_userdata = "";
+                this.txclickable_button_onclick_animate_done_continue( use_id , userData );
+
             }
         }
    }
@@ -621,39 +785,149 @@ export class Txstage extends Entity {
 
 
    //--------------
-   txclickable_button_onclick_animate_done_continue( id ) {
+   // Bookmark button_onclick
+   txclickable_button_onclick_animate_done_continue( id , userData ) {
 
         if ( id == "singleplayer" ) {
 
             this.menu_page = 1;
+            this.game_mode = 1;
+            this.opponent = "A.I Bot";
+
             this.rearrange_cards_collection();
             this.update_button_ui();
 
+
+        } else if ( id == "multiplayer" ) {
+
+            this.menu_page = 3;
+            this.game_mode = 2;
+            this.opponent = "";
+            this.update_button_ui();
+
+            let params  = {
+                userID      : this.userID
+            }
+            this.messageBus.emit( "whohost", params );
+
+
+        } else if ( id == "hostgame" ) {
+
+            this.menu_page = 4;
+            this.game_mode = 2;
+            this.opponent = "";
+            this.update_button_ui();
+
+            this.isHost   = 1;
+            this.isClient = 0;
+
+            let params  = {
+                userID      : this.userID,
+            }
+            this.messageBus.emit( "iamhost", params );
+            
+
+
+        } else if ( id == "play" ) {
+
+            this.menu_page = 5;
+            this.game_mode = 2;
+            this.opponent = "";
+            this.update_button_ui();
+
+            if ( userData != "" ) {
+                let params  = {
+                    userID      : this.userID,
+                    recipient   : userData
+                }
+                this.messageBus.emit( "join", params );
+            }
+
+
+
         } else if ( id == "cancel" ) {
 
-            this.menu_page = 0;
+            if ( this.menu_page == 4 ) {
+                this.menu_page = 3;
+            } else {
+                this.menu_page = 0;
+            }
             this.update_button_ui();
+
 
         } else if ( id == "confirm" ) {
 
             if ( this.game_state == 0 && this.menu_page == 1 ) {
-                if ( this.count_card_selected() == 8 ) {
+                
+                this.menu_page = 2;
+                this.update_button_ui();
 
-                    this.fill_player_cards_selected();
-                    this.rearrange_cards_selected(); 
-                    this.game_state = 1;
-                    this.sounds["warhorn"].playOnce();
-                    this.update_button_ui();
-                    this.menu_labels["lbl1"].getComponent( TextShape ).value = "Battle Begins!";
-                } else {
-                     this.menu_labels["lbl1"].getComponent( TextShape ).value = "Please select exactly 8 cards";
-                }
+
+                this.sounds["warhorn"].playOnce();
+
+                this.animate_button_callback_id = "battlebegin";
+                this.animate_button_tick = 40;
+
+                this.uiimg_redflag.visible = true;
+                this.uiimg_blueflag.visible = true;
+                this.uitxt_instruction.value = "Fight";
+
             }
+
+        } else if ( id == "battlebegin" ) {
+
+            this.fill_player_cards_selected();
+            this.rearrange_cards_selected(); 
+            this.game_state = 1;
+            
+            
+            this.sounds["medieval"].stop();
+            this.sounds["wardrum"].playOnce();
+            this.current_mana = 50;
+
+            this.update_button_ui();
+
+            this.menu_labels["lbl2"].getComponent( TextShape ).value = "VS";
+            
+            if ( this.playerindex == 1 ) {
+                this.menu_labels["lbl1"].getComponent( TextShape ).value = this.userID;
+                this.menu_labels["lbl3"].getComponent( TextShape ).value = this.opponent;
+            } else { 
+                this.menu_labels["lbl1"].getComponent( TextShape ).value = this.opponent;
+                this.menu_labels["lbl3"].getComponent( TextShape ).value = this.userID;
+            }
+
+
+            this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Red();
+            this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Blue();
+
+            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 1 )
+            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.5 )
+            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 1 )
+            
+            this.menu_labels["lbl2"].getComponent( Transform ).position.y = 3.25
+            this.menu_labels["lbl3"].getComponent( Transform ).position.y = 2.25
+                    
+
         } else if ( id == "leavegame" ) {
 
             this.game_state = 0;
             this.menu_page = 0;
             this.uitxt_instruction.value = "";
+
+            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 0.3 )
+            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.3 )
+            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 0.3 )
+            
+            this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Black();
+            this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Black();
+
+            this.menu_labels["lbl2"].getComponent( Transform ).position.y = 3.9;
+            this.menu_labels["lbl3"].getComponent( Transform ).position.y = 3.55;
+            
+            this.sounds["wardrum"].stop();
+            this.sounds["medieval"].playOnce();
+              
 
             this.reset_game();
             this.update_button_ui();
@@ -758,16 +1032,23 @@ export class Txstage extends Entity {
                 log("bus: join", info);
                         
                 // Somebody join me    
-                /*
-                _this.opponent = info.userID;
+                // Reason for using emitBus is because we dont want to use messageBus to send in onData handler. 
+                // We let the update() to send instead.
                 _this.emitBus.push( [ "join_resp" , info.userID ] );
                 _this.emitBus.push( [ "gametaken" ] );
-                _this.show_status_msg( _this.opponent + " joined the game you hosted.");
-                _this.page = "gameon";
-                _this.turn = this.userID;
-                _this.reset();
-                _this.refresh_gameon_page_ifneeded();
-                */
+
+
+                _this.opponent = info.userID;
+                _this.game_mode = 2;
+                _this.menu_page = 1;
+                _this.playerindex = 1;
+
+                
+                this.rearrange_cards_collection();
+                this.update_button_ui();
+
+
+                
             }
         });
         this.messageBus.on("join_resp", (info: EmitArg) => {
@@ -775,38 +1056,39 @@ export class Txstage extends Entity {
             // Host resp my join
             if ( this.userID != info.userID  && this.userID == info.recipient ) {
                 log("bus: join_resp", info );
-                /*
+                
                 _this.opponent = info.userID;
-                _this.show_status_msg(  _this.opponent + " accepted your challenge.");
-
                 _this.isClient = 1;
-                _this.page = "gameon";
-                _this.turn = info.userID;
-                _this.reset();
-                _this.refresh_gameon_page_ifneeded();
-                */
+                
+                _this.game_mode = 2;
+                _this.menu_page = 1;
+                _this.playerindex = -1;
+               
+                this.rearrange_cards_collection();
+                this.update_button_ui();
+
             }
         });
 
         this.messageBus.on("iamhost", (info: EmitArg) => {
             log("buso iamhost", info );
             if ( this.userID != info.userID ) {
-                /*
+                
                 log("bus: iamhost", info );
                 _this.available_gamehosts[ info.userID ] = 1;
                 _this.refresh_available_games_ifneeded();
-                */
+                
             }
         });
 
         this.messageBus.on("whohost", (info: EmitArg) => {
             if ( this.userID != info.userID ) {
                 log("bus: whohost", info );
-                /*
+                
                 if ( _this.isHost == 1 && _this.opponent == "" ) {
                     _this.emitBus.push( [ "iamhost" , info.userID ] );
                 }
-                */
+                
             }
         });
 
@@ -815,10 +1097,10 @@ export class Txstage extends Entity {
         this.messageBus.on("gametaken", (info: EmitArg) => {
             if ( this.userID != info.userID ) {
                 log("bus: gametaken", info );
-                /*
+                
                 delete  _this.available_gamehosts[ info.userID ] ;
                 _this.refresh_available_games_ifneeded();
-                */
+                
             }
         });
 
@@ -919,7 +1201,7 @@ export class Txstage extends Entity {
 
         // Clear everything.
         let u;
-        for ( u = this.units.length ; u >= 0 ;  u--) {
+        for ( u = this.units.length - 1 ; u >= 0 ;  u--) {
             let unit = this.units[u];
             if ( unit != null ) {
                 this.removeUnit( unit ); 
@@ -927,7 +1209,7 @@ export class Txstage extends Entity {
         }
 
         let p;
-        for ( p = this.projectiles.length ; p >= 0 ; p-- ) {
+        for ( p = this.projectiles.length - 1 ; p >= 0 ; p-- ) {
             let projectile = this.projectiles[p];
             if ( projectile != null  ) {
                 this.removeProjectile( projectile );
@@ -935,7 +1217,7 @@ export class Txstage extends Entity {
         }
 
         let exp;
-        for ( exp = this.explosions.length ; exp >= 0 ; exp-- ) {
+        for ( exp = this.explosions.length - 1 ; exp >= 0 ; exp-- ) {
             let explosion = this.explosions[exp];
             if ( explosion != null  ) {
                this.removeExplosion( explosion );
@@ -943,7 +1225,7 @@ export class Txstage extends Entity {
         }
         
         let cl;
-        for ( cl = this.clocks.length ; cl >= 0 ; cl-- ) {
+        for ( cl = this.clocks.length - 1 ; cl >= 0 ; cl-- ) {
             let clock = this.clocks[cl];
             if ( clock != null  ) {
                 this.removeClock( clock );
@@ -966,13 +1248,51 @@ export class Txstage extends Entity {
         this.game_state = 2;
         let final_txt = "Game Over.\n";
         if ( this.score_r > this.score_b ) {
+        
             final_txt += "Red Wins!";
+            this.uiimg_redflag.visible = true;
+            
+
         } else if ( this.score_r < this.score_b ) {
             final_txt += "Blue Wins!";
+            this.uiimg_blueflag.visible = true;
+            
         } else {
-            final_txt += "Draw Game";
+
+            let i;
+            let smallest_r = 5000;
+            let smallest_b = 5000;
+            for ( i = 0 ; i < 3; i++ ) {
+                if ( this.units[i] != null && this.units[i].dead == 0 ) {
+                    if ( this.units[i].curhp < smallest_b ) {
+                        smallest_b = this.units[i].curhp;
+                    }
+                }
+            }
+            for ( i = 3 ; i < 6; i++ ) {
+                if ( this.units[i] != null && this.units[i].dead == 0 ) {
+                    if ( this.units[i].curhp < smallest_r ) {
+                        smallest_r = this.units[i].curhp;
+                    }
+                }
+            }
+            if ( smallest_r < smallest_b ) {
+                final_txt += "Tie Breaker: Blue Wins!";
+                this.uiimg_blueflag.visible = true;
+            } else if ( smallest_b < smallest_r ) {
+                final_txt += "Tie Breaker: Red Wins!";
+                this.uiimg_redflag.visible = true;
+            
+            } else {
+                final_txt += "Draw Game";
+                this.uiimg_redflag.visible = true;
+                this.uiimg_blueflag.visible = true;
+            }
+            
         }
-        final_txt += "\n\nClick Restart to play again";
+
+
+        final_txt += "\n\nLeave game to restart again";
         this.uitxt_instruction.value = final_txt;
         this.uitxt_time.value = "";
 
@@ -1226,8 +1546,16 @@ export class Txstage extends Entity {
 
 
     //-----------------------------------------------------------
-    public all_available_cards = [ "skeleton", "giant" , "knight", "archer" , "wizard" , "goblin" , "gargoyle" , "gargoylehorde", "spell_fireball","spell_zap", "goblinhut", "tombstone", "hogrider", "prince", "goblinspear" ,"pekka" ];
-    public all_available_cards_mana = [ 15 , 60, 50, 30,  50, 30, 40, 50,  40, 20, 50,40,   40, 50, 30, 70];
+    public all_available_cards = [ 
+        "skeleton", "giant" , "knight", "archer" , 
+        "wizard" , "goblin" , "gargoyle" , "gargoylehorde", 
+        "spell_fireball","spell_zap", "goblinhut", "tombstone", 
+        "hogrider", "prince", "goblinspear" ,"pekka" 
+    ];
+    
+    public all_available_cards_mana = [ 15 , 60, 35, 30,      50, 25, 40, 30,     40, 20, 50,40,   40, 50, 30, 70];
+    
+
     public all_available_cards_isspell = [ 0 , 0 , 0 , 0 ,    0 , 0, 0, 0,     1 , 1 ,0, 0,    0, 0, 0, 0 ];
 
 
@@ -1343,8 +1671,20 @@ export class Txstage extends Entity {
         ));
         this.menu_labels["lbl2"].getComponent( TextShape ).color = Color3.Black();
         this.menu_labels["lbl2"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
-
         this.menu_labels["lbl2"].setParent( this.ui3d_root );
+
+
+        this.menu_labels["lbl3"] = new Entity();
+        this.menu_labels["lbl3"].addComponent( new TextShape() );
+        this.menu_labels["lbl3"].addComponent( new Transform(
+            {
+                position:new Vector3( 0,  3.55 , 0 ),
+                scale   :new Vector3( 0.3, 0.3, 0.3 )
+            }
+        ));
+        this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl3"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+        this.menu_labels["lbl3"].setParent( this.ui3d_root );
 
 
 
@@ -1436,7 +1776,41 @@ export class Txstage extends Entity {
         );
         this.buttons["leavegame"].hide();
         
-        
+            
+
+        // host game 
+         this.buttons["hostgame"] = new Txclickable_box(
+            "Host Game" , 
+            "hostgame",
+            {
+                position: new Vector3( 1.5 , 3, 0),
+                scale   : new Vector3(0.5,0.5,0.5)
+            },
+            this.ui3d_root,
+            this
+        );
+        this.buttons["hostgame"].hide();
+
+
+        // This one is for joining game.
+        let i;
+        let itemcount = 5;
+        for ( i = 0 ; i < itemcount;  i++ ) {
+
+            this.buttons["playButton" + i ] = new Txclickable_box(
+                "Play", 
+                "play",
+                {
+                    position: new Vector3( 1.5 , 1.5 - i * 0.9  ,  0 ),
+                    scale   : new Vector3(0.5,0.5, 0.5)
+                },
+                this.ui3d_root,
+                this
+            );
+
+            this.buttons["playButton" + i ].hide();
+            this.buttons["playButton" + i ].box_transform.scale.x = 4.2;
+        }
     }   
 
 
@@ -1666,6 +2040,32 @@ export class Txstage extends Entity {
         this.uiimg_selected_card.visible = false;
         
 
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.redflag );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "center";
+        ui_2d_image.sourceWidth = 256;
+        ui_2d_image.sourceHeight = 256;
+        ui_2d_image.width = 256;
+        ui_2d_image.height = 256;
+        ui_2d_image.positionX = -100;
+        ui_2d_image.positionY = 140;
+        ui_2d_image.visible = false ;
+
+        this.uiimg_redflag = ui_2d_image;
+
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.blueflag );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "center";
+        ui_2d_image.sourceWidth = 256;
+        ui_2d_image.sourceHeight = 256;
+        ui_2d_image.width = 256;
+        ui_2d_image.height = 256;
+        ui_2d_image.positionX = 100;
+        ui_2d_image.positionY = 140;
+        ui_2d_image.visible = false ;
+        
+        this.uiimg_blueflag = ui_2d_image;
+
     }
 
 
@@ -1740,6 +2140,9 @@ export class Txstage extends Entity {
         for ( snd in resources.sounds ) {
             this.sounds[snd]     = new Txsound(this, resources.sounds[snd] );
         }    
+
+        this.sounds["wardrum"].playOnce();
+
     }
 
 
@@ -1747,8 +2150,10 @@ export class Txstage extends Entity {
 
 
 
-
-
+    //----------------
+    init_aibot() {
+        this.aibot = new TxAIBot( this );
+    }
 
 
 
@@ -2268,9 +2673,12 @@ export class Txstage extends Entity {
 
         if ( type == "skeleton" ) {
             
-            this.createUnit( type, x - 0.1 , z - 0.1 , owner, wait_buffer );
-            this.createUnit( type, x + 0.1 , z - 0.1 , owner, wait_buffer );
-            this.createUnit( type, x       , z + 0.1 , owner, wait_buffer );
+            this.createUnit( type, x - 0.2 , z - 0.2 , owner, wait_buffer );
+            this.createUnit( type, x + 0.2 , z - 0.2 , owner, wait_buffer );
+            this.createUnit( type, x       , z + 0.0 , owner, wait_buffer );
+            this.createUnit( type, x - 0.2 , z + 0.2 , owner, wait_buffer );
+            this.createUnit( type, x + 0.2 , z + 0.2 , owner, wait_buffer );
+            
         
 
         } else if ( type == "archer" ) {
@@ -2401,8 +2809,9 @@ export class Txstage extends Entity {
             maxhp       = 67;
             attackSpeed = 30;
 
-            speed       = 5;
+            speed       = 6;
 
+            this.sounds["skeletonhit"].playOnce();
            
     	
     	} else if ( type == "giant" ) {
@@ -2416,15 +2825,14 @@ export class Txstage extends Entity {
             maxhp       = 3275;
             attackSpeed = 45;
 
-            speed       = 5;
-
-
-
+            speed       = 6;
 
             healthbar_y = 4;
             attack_building_only = 1;
 
+            this.sounds["burp"].playOnce();
             
+                
     	
     	} else if ( type == "knight" ) {
 
@@ -2437,7 +2845,7 @@ export class Txstage extends Entity {
             maxhp       = 1452;
             attackSpeed = 36;
 
-            speed       = 5;
+            speed       = 7;
 
 
     	
@@ -2453,7 +2861,7 @@ export class Txstage extends Entity {
             maxhp       = 252;
             attackSpeed = 36;
             
-            speed       = 5;
+            speed       = 7;
 
 
 
@@ -2475,7 +2883,7 @@ export class Txstage extends Entity {
             maxhp       = 598;
             attackSpeed = 42;
             
-            speed       = 5;
+            speed       = 6;
 
             attackRange = 5.0;
             projectile_user = 1;
@@ -2491,10 +2899,11 @@ export class Txstage extends Entity {
     		speed 		= 5.0;
 
     		damage      = 90;
-            maxhp       = 167;
+            maxhp       = 267;
             attackSpeed = 33;
             
             speed       = 20;
+            attackRange = 0.6;
 
 
     	} else if ( type == "gargoyle" ) {
@@ -2506,9 +2915,9 @@ export class Txstage extends Entity {
     		isFlying    = 1;
             
             damage      = 161;
-            maxhp       = 695;
+            maxhp       = 795;
             attackSpeed = 48;
-            speed       = 5;
+            speed       = 10;
 
             this.sounds["gargoyle"].playOnce();
 
@@ -2520,9 +2929,9 @@ export class Txstage extends Entity {
     		isFlying    = 1;
             
             damage      = 84;
-            maxhp       = 190;
+            maxhp       = 220;
             attackSpeed = 30;
-            speed       = 5;
+            speed       = 12;
 
             this.sounds["gargoyle"].playOnce();
             
@@ -2554,7 +2963,10 @@ export class Txstage extends Entity {
             maxhp       = 1669;
             attackSpeed = 42;
 
-            speed       = 15;
+            speed       = 13;
+
+            attackRange = 0.6;
+        
 
             this.sounds["horse"].playOnce();
 
@@ -2572,8 +2984,10 @@ export class Txstage extends Entity {
             attackSpeed = 48;
             speed       = 15;
 
+             attack_building_only = 1;
+
             this.sounds["pig"].playOnce();
-            
+            attackRange = 0.4;
 
 
         } else if ( type == "pekka" ) {
@@ -2586,7 +3000,11 @@ export class Txstage extends Entity {
             damage      = 678;
             maxhp       = 3125;
             attackSpeed = 54;
-            speed       = 5;
+            speed       = 6;
+            healthbar_y = 5.5;
+
+            attackRange = 0.62;
+
 
 
 

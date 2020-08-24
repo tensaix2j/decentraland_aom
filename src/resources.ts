@@ -49,7 +49,10 @@ export default {
 		crown_b : new Texture("models/crown_b.png"),
 		manabar: new Texture("models/manabar.png"),
 		manaoutline: new Texture("models/manaoutline.png"),
-		manaruler: new Texture("models/manaruler.png")
+		manaruler: new Texture("models/manaruler.png"),
+
+		redflag: new Texture("models/redflag.png"),
+		blueflag: new Texture("models/blueflag.png")
 		
 
 	},
@@ -73,7 +76,10 @@ export default {
 		denied: new AudioClip("sounds/denied.mp3"),
 		horse: new AudioClip("sounds/horse.mp3"),
 		gargoyle: new AudioClip("sounds/gargoyle.mp3"),
-		pig: new AudioClip("sounds/pig.mp3")
+		pig: new AudioClip("sounds/pig.mp3"),
+		burp:new AudioClip("sounds/burp.mp3"),
+		wardrum:new AudioClip("sounds/wardrum.mp3"),
+		medieval: new AudioClip("sounds/medieval.mp3")
 	}
 
 

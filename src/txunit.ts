@@ -214,7 +214,7 @@ export class Txunit extends Entity {
 			this.getComponent(Animator).addClip( new AnimationState("Punch") );
 			this.getComponent(Animator).addClip( new AnimationState("Die") );
    			
-
+			this.stopAnimation("_idle");
 			this.stopAnimation("Punch");
 			this.playAnimation("Walking", 1 );
    			//log( this.id , "createAnimationStates" );	
@@ -411,8 +411,19 @@ export class Txunit extends Entity {
 			} else if ( this.type == "tombstone" ) {
 				this.parent.createUnit( "skeleton" , this.transform.position.x,  this.transform.position.z, this.owner , 48) ;
 			}
+
+
 		} else {
 			this.tick -= 1;
+		
+			this.curhp -= 1;
+			if ( this.curhp <= 0 ) {
+				this.curhp = 0;
+			}
+			this.refresh_hp();
+			if ( this.curhp <= 0 ) {
+				this.die();
+			}
 		}
 						
 	}
@@ -463,6 +474,7 @@ export class Txunit extends Entity {
 
 						this.stopAnimation("Walking" );	
 						this.stopAnimation("_idle" );	
+						
 						this.playAnimation("Punch", 0 );
 						this.lookat_target( diff_x , diff_z );
 							
@@ -545,10 +557,14 @@ export class Txunit extends Entity {
 
 				this.attacktarget = null;
 				this.movetarget = null;
+				this.walking_queue.length = 0;
 				this.attacking = 0;
 				if ( this.shapetype == "dynamic" ) {
+					
 					this.stopAnimation("Punch");
+					this.stopAnimation("_idle");
 					this.playAnimation("Walking", 1 );
+
 				}
 
 			}
@@ -598,6 +614,8 @@ export class Txunit extends Entity {
 				this.attacking = 0;
 
 				this.stopAnimation("Punch");
+				this.stopAnimation("_idle");
+					
 				this.playAnimation("Walking", 1 );
 
 
@@ -786,10 +804,21 @@ export class Txunit extends Entity {
     	this.walking_queue.length = 0 ;
     	let target;
 
+    	let target_at_otherside = 0;
+    	if ( ( this.transform.position.z < 0 && this.movetarget.transform.position.z > 0) || ( this.transform.position.z > 0 && this.movetarget.transform.position.z < 0 ) ) {
+    		target_at_otherside = 1;
+    	}
+    	
+
     	if ( this.isFlying == 0 && ( this.owner == 1 && this.movetarget.transform.position.z > 0  || this.owner == -1 && this.movetarget.transform.position.z < 0 ) ) {
 
+
+
+
+
+
 	    	// Walk around own middle castle 
-	    	if (  (  ( this.owner == 1 && this.transform.position.z < -6.7 )  ||  ( this.owner == -1 && this.transform.position.z > 6.7 )  )   && this.transform.position.x > -1 && this.transform.position.x < 1 ) {
+	    	if (  target_at_otherside == 1 && (  ( this.owner == 1 && this.transform.position.z < -6.7 )  ||  ( this.owner == -1 && this.transform.position.z > 6.7 )  )   && this.transform.position.x > -1 && this.transform.position.x < 1 ) {
 	    		
 	    		target = new Vector3(0,0,0);
 	    		target.z = -1.5 * this.owner;
@@ -808,7 +837,7 @@ export class Txunit extends Entity {
 
 
 		    // Walk around own side castle
-			} else if (  ( this.owner == 1 && this.transform.position.z < -4.55 ) ||  ( this.owner == -1 && this.transform.position.z > 4.55) ) {
+			} else if ( target_at_otherside == 1 && (  ( this.owner == 1 && this.transform.position.z < -4.55 ) ||  ( this.owner == -1 && this.transform.position.z > 4.55) ) ) {
 
 				target = new Vector3(0,0,0);
 	    		target.z = -1.5 * this.owner;
@@ -830,7 +859,7 @@ export class Txunit extends Entity {
 			}
 
 	    	// Bridge target
-	    	if (  ( this.owner == 1 && this.transform.position.z < -0.5 ) || ( this.owner == -1 && this.transform.position.z > 0.5 ) ) {
+	    	if (  target_at_otherside == 1 && ( ( this.owner == 1 && this.transform.position.z < -0.5 ) || ( this.owner == -1 && this.transform.position.z > 0.5 ) )) {
 
 	    		target = new Vector3(0,0,0);
 	    		target.z = this.owner * -0.5;
