@@ -16,7 +16,7 @@ export class Txcard extends Entity {
 	public isSelected = 0;
 	public card_sel_highlight;
 
-	constructor( id, parent , transform_args, type , stage , highlight_material  ) {
+	constructor( id, parent , transform_args, type , stage , highlight_material , manaCost  ) {
 
 		super();
 		engine.addEntity(this);
@@ -26,6 +26,7 @@ export class Txcard extends Entity {
 		this.parent = parent;
 		this.type = type;
 		this.stage = stage;
+		this.manaCost = manaCost;
 
 		this.transform = new Transform( transform_args );
 
@@ -93,6 +94,35 @@ export class Txcard extends Entity {
 			    }
 			)
 		);
+
+		let manacostcontainer = new Entity() ;
+		manacostcontainer.setParent( this );
+		manacostcontainer.addComponent( new Transform( 
+			{
+				position:new Vector3( -0.45, -0.5, 0.1),
+				scale: new Vector3(0.4,0.4,0.4)
+			}
+		));
+		manacostcontainer.addComponent( new PlaneShape );
+		let material = new Material();
+		material.albedoTexture = resources.textures.manaoutline;
+		material.specularIntensity = 0;
+		material.transparencyMode = 2;
+		material.roughness = 1;
+		manacostcontainer.getComponent( Transform ).rotation.eulerAngles = new Vector3(0,0,180);
+		manacostcontainer.addComponent( material );
+
+		let txtmanacost = new Entity();
+		txtmanacost.setParent( manacostcontainer );
+		txtmanacost.addComponent( new Transform( 
+		{
+			position: new Vector3(0,0, 0.01),
+			scale  : new Vector3(0.5,0.5,0.5)
+		}
+		));
+		txtmanacost.addComponent( new TextShape( (  this.manaCost  ) + "") );
+		txtmanacost.getComponent( TextShape ).color = Color3.White();
+		txtmanacost.getComponent( Transform ).rotation.eulerAngles = new Vector3( 180,0,0);
 
 
 	}

@@ -62,6 +62,10 @@ export class Txstage extends Entity {
     public uitxt_score_b ;
     public uitxt_instruction;
     public uitxt_time ;
+    public uitxt_mana;
+    public uiimg_selected_card;
+    public uitxt_selected_card_mana;
+
 
     public score_r = 0;
     public score_b = 0;
@@ -324,9 +328,12 @@ export class Txstage extends Entity {
             this.current_mana += 0.1 ;
         }
         
-        let calc_height = ( this.current_mana  * 478 / 100 ) >> 0;
+        let calc_height = ( this.current_mana  * 256 / 100 ) >> 0;
+
         this.uiimage_manabar.height = calc_height;
-        this.uiimage_manabar.positionY =   -( 256 - calc_height / 2 );
+        this.uiimage_manabar.positionY =   -( 128 - calc_height / 2 );
+        this.uitxt_mana.value = ( this.current_mana >> 0 ) + "/100" ;
+    
     }
 
 
@@ -680,6 +687,11 @@ export class Txstage extends Entity {
             }
             txcard.turnon(); 
             this.txcard_selected = txcard ;
+
+            this.uiimg_selected_card.source = txcard.getComponent(Material).albedoTexture;
+            this.uiimg_selected_card.visible = true;
+            this.uitxt_selected_card_mana.value = txcard.manaCost;
+
             this.uitxt_instruction.value = "";
             
         }   
@@ -1005,6 +1017,9 @@ export class Txstage extends Entity {
             this.txcard_selected.turnoff();
         }
         this.txcard_selected = null;
+        this.uiimg_selected_card.visible = false;
+                
+
         this.rearrange_cards_selected(); 
         
     }
@@ -1271,14 +1286,14 @@ export class Txstage extends Entity {
                 },
                 card_type,
                 this,
-                card_sel_highlight_material
+                card_sel_highlight_material,
+                card_mana
             );
 
             txcard.isSpell = this.all_available_cards_isspell[i] ;
 
 
 
-            txcard.manaCost = card_mana;
             this.player_cards_collection.push( txcard );
         }
 
@@ -1519,6 +1534,9 @@ export class Txstage extends Entity {
         ui_2d_image.sourceHeight = 128;
         ui_2d_image.positionX = 100;
         
+
+
+
         let ui_2d_text = new UIText( ui_2d_canvas );
         ui_2d_text.value = "0";
         ui_2d_text.vAlign = "bottom";
@@ -1556,37 +1574,98 @@ export class Txstage extends Entity {
         this.uitxt_instruction = ui_2d_text;
 
 
-        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manacontainer );
-        ui_2d_image.vAlign = "center";
-        ui_2d_image.hAlign = "right";
-        ui_2d_image.width = 32;
-        ui_2d_image.height = 532;
-        ui_2d_image.sourceWidth = 64;
-        ui_2d_image.sourceHeight = 1024;
-        ui_2d_image.positionX = -16;
+
+        ui_2d_text = new UIText( ui_2d_canvas );
+        ui_2d_text.value = "100/100";
+        ui_2d_text.vAlign = "center";
+        ui_2d_text.hAlign = "right";
+        ui_2d_text.fontSize = 16;
+        ui_2d_text.positionX = 30;
+        ui_2d_text.positionY = 160;
+        this.uitxt_mana = ui_2d_text;
+
+
+
+
+
+
+
+       
 
 
         ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manabar );
         ui_2d_image.vAlign = "center";
         ui_2d_image.hAlign = "right";
-        ui_2d_image.width = 24;
-        let calc_height = this.current_mana * 478 / 100  ;
-        ui_2d_image.height = calc_height;
-        ui_2d_image.positionY = -( 256 - calc_height / 2  );
-        ui_2d_image.sourceWidth = 49;
-        ui_2d_image.sourceHeight = 956;
+        
+
+        ui_2d_image.sourceWidth  = 32;
+        ui_2d_image.sourceHeight = 250;
+        ui_2d_image.width = 32;
         ui_2d_image.positionX = -20;
-
         this.uiimage_manabar = ui_2d_image;
+        
+        this.update_mana();
+        
 
-         ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manalabel );
+
+
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.manaruler );
         ui_2d_image.vAlign = "center";
         ui_2d_image.hAlign = "right";
+        ui_2d_image.sourceWidth  = 32;
+        ui_2d_image.sourceHeight = 250;
         ui_2d_image.width = 32;
-        ui_2d_image.height = 512;
-        ui_2d_image.sourceWidth = 64;
-        ui_2d_image.sourceHeight = 1024;
-        ui_2d_image.positionX = -16;
+        ui_2d_image.height = 250;
+        ui_2d_image.positionX = -20;
+        ui_2d_image.positionY = 0;
+               
+
+
+
+
+
+        // Selected card 2d ui
+
+        ui_2d_image = new UIImage(ui_2d_canvas , resources.textures.giant );
+        ui_2d_image.vAlign = "center";
+        ui_2d_image.hAlign = "right";
+        
+        ui_2d_image.sourceWidth = 256;
+        ui_2d_image.sourceHeight = 256;
+        
+        ui_2d_image.width = 64;
+        ui_2d_image.height = 64;
+        
+        ui_2d_image.positionX = -10;
+        ui_2d_image.positionY = 200;
+        this.uiimg_selected_card = ui_2d_image;
+
+
+        ui_2d_image = new UIImage( this.uiimg_selected_card , resources.textures.manaoutline );
+        ui_2d_image.vAlign = "bottom";
+        ui_2d_image.hAlign = "right";
+            
+        ui_2d_image.sourceWidth = 128;
+        ui_2d_image.sourceHeight = 128;
+        
+        ui_2d_image.width = 32;
+        ui_2d_image.height = 32;
+        ui_2d_image.positionX = 10;
+        ui_2d_image.positionY = -10;
+        
+
+        ui_2d_text = new UIText(  this.uiimg_selected_card );
+        ui_2d_text.value = "20";
+        ui_2d_text.vAlign = "bottom";
+        ui_2d_text.hAlign = "right";
+        ui_2d_text.fontSize = 12;
+        ui_2d_text.positionX =  50;
+        ui_2d_text.positionY =   -2;
+        this.uitxt_selected_card_mana = ui_2d_text;
+
+        this.uiimg_selected_card.visible = false;
+        
+
     }
 
 
@@ -2432,7 +2511,7 @@ export class Txstage extends Entity {
             speed       = 5;
 
             this.sounds["gargoyle"].playOnce();
-            
+
     	} else if ( type == "gargoylehorde" ) {
     		y 			= 2.5;
     		modelsize 	= 0.12;

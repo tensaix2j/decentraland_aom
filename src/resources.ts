@@ -47,10 +47,10 @@ export default {
 		clock: new Texture("models/clock.png"),
 		crown_r : new Texture("models/crown_r.png"),
 		crown_b : new Texture("models/crown_b.png"),
-		manacontainer: new Texture("models/manacontainer.png"),
 		manabar: new Texture("models/manabar.png"),
-		manalabel: new Texture("models/manalabel.png")
-
+		manaoutline: new Texture("models/manaoutline.png"),
+		manaruler: new Texture("models/manaruler.png")
+		
 
 	},
 

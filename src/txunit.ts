@@ -198,10 +198,14 @@ export class Txunit extends Entity {
     createAnimationStates() {
         
         if ( this.type == "tower" ) {
+        	
         	this.getComponent(Animator).addClip( new AnimationState("ArmatureAction") );
 			this.getComponent(Animator).getClip("ArmatureAction").playing = true;
+
 			this.tower_archer.getComponent(Animator).addClip( new AnimationState("Punch") );
+			this.tower_archer.getComponent(Animator).addClip( new AnimationState("_idle") );
 			
+
         } else if ( this.isSpawner == 0 ) {
 
 
@@ -458,6 +462,7 @@ export class Txunit extends Entity {
 					if ( this.tick == this.attackSpeed ) {
 
 						this.stopAnimation("Walking" );	
+						this.stopAnimation("_idle" );	
 						this.playAnimation("Punch", 0 );
 						this.lookat_target( diff_x , diff_z );
 							
@@ -636,7 +641,7 @@ export class Txunit extends Entity {
     	}
     	this.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
 		this.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
-		
+
 	   	this.updatePosition_toBox2d();
 		
 	}
@@ -933,6 +938,8 @@ export class Txunit extends Entity {
     	//log( this.type , this.id , "Attempt to stop" , action_name );
     	let clip;
     	if ( action_name == "Punch" && this.type == "tower" ) {
+			clip = this.tower_archer.getComponent(Animator).getClip( action_name );
+		} else if ( action_name == "_idle" && this.type == "tower" ) {
 			clip = this.tower_archer.getComponent(Animator).getClip( action_name );
 		} else {
 			clip = this.getComponent(Animator).getClip(action_name);
