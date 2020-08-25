@@ -122,8 +122,8 @@ export class Txstage extends Entity {
     public isClient     = 0;
     public opponent     = "";
     public available_gamehosts = {}    
-
-
+    public isReady      = 0;
+    public isOpponentReady = 0;
 
 
 
@@ -713,9 +713,27 @@ export class Txstage extends Entity {
 
             if ( this.count_card_selected() == 8 ) {
                 
-                this.animate_button_tick = 20;
-                this.animate_button_callback_id = id;
-                this.sounds["buttonclick"].playOnce();
+
+                if ( this.game_mode == 1 ) {
+                
+                    // Single player. Can start straight away..
+                    this.animate_button_tick = 20;
+                    this.animate_button_callback_id = id;
+                    this.sounds["buttonclick"].playOnce();
+                
+
+                } else if ( this.game_mode == 2 ) {
+
+                    // Multiplayer requires both player to click confirm.
+
+                    let params  = {
+                        userID      : this.userID,
+                        recipient   : this.opponent
+                    }
+                    this.messageBus.emit( "iamready", params );
+                    this.isReady = 1;
+                    this.check_both_ready("confirm");
+                }
 
             } else {
                 this.menu_labels["lbl1"].getComponent( TextShape ).value = "Please select exactly 8 cards";
@@ -733,6 +751,26 @@ export class Txstage extends Entity {
         }
 
    }
+
+
+    //----------
+    check_both_ready( id ) {
+
+        if ( this.isReady == 1 && this.isOpponentReady == 1 ) {
+            this.animate_button_tick = 20;
+            this.animate_button_callback_id = id;
+            this.sounds["buttonclick"].playOnce();
+            this.globaltick = 0;
+            
+
+        } else {
+            if ( this.isReady == 1 ) {
+                this.menu_labels["lbl3"].getComponent( TextShape ).value = "Waiting for " +  this.opponent + " to get Ready ...";
+            } else {
+                this.menu_labels["lbl3"].getComponent( TextShape ).value = this.opponent + " is Ready";
+            }
+        }
+    }
 
 
    //-------------------------
@@ -803,6 +841,8 @@ export class Txstage extends Entity {
             this.menu_page = 3;
             this.game_mode = 2;
             this.opponent = "";
+            
+
             this.update_button_ui();
 
             let params  = {
@@ -816,6 +856,8 @@ export class Txstage extends Entity {
             this.menu_page = 4;
             this.game_mode = 2;
             this.opponent = "";
+            this.isOpponentReady = 0;
+
             this.update_button_ui();
 
             this.isHost   = 1;
@@ -833,6 +875,8 @@ export class Txstage extends Entity {
             this.menu_page = 5;
             this.game_mode = 2;
             this.opponent = "";
+            this.isOpponentReady = 0;
+
             this.update_button_ui();
 
             if ( userData != "" ) {
@@ -848,7 +892,27 @@ export class Txstage extends Entity {
         } else if ( id == "cancel" ) {
 
             if ( this.menu_page == 4 ) {
+                // I host then click cancel.
                 this.menu_page = 3;
+                let params  = {
+                    userID      : this.userID,
+                }
+                this.messageBus.emit( "gametaken", params );
+
+            
+            } else if ( this.menu_page == 1 && this.game_mode == 2 ) {
+            
+                let params  = {
+                    userID      : this.userID,
+                    recipient   : this.opponent
+                }
+                this.messageBus.emit( "leave", params );
+                this.isHost = 0;
+                this.isClient = 0;
+                this.opponent = "";
+                this.game_mode = 0;
+                this.menu_page = 0;
+
             } else {
                 this.menu_page = 0;
             }
@@ -859,6 +923,7 @@ export class Txstage extends Entity {
 
             if ( this.game_state == 0 && this.menu_page == 1 ) {
                 
+               
                 this.menu_page = 2;
                 this.update_button_ui();
 
@@ -871,6 +936,8 @@ export class Txstage extends Entity {
                 this.uiimg_redflag.visible = true;
                 this.uiimg_blueflag.visible = true;
                 this.uitxt_instruction.value = "Fight";
+            
+           
 
             }
 
@@ -927,10 +994,26 @@ export class Txstage extends Entity {
             
             this.sounds["wardrum"].stop();
             this.sounds["medieval"].playOnce();
-              
+            
+            if ( this.game_mode == 2 ) {
+
+                 let params  = {
+                    userID      : this.userID,
+                    recipient   : this.opponent
+                }
+                this.messageBus.emit( "leave", params );
+            }
+
+
+            this.isHost = 0;
+            this.isClient = 0;
+            this.opponent = "";
+            this.game_mode = 0;
+                 
 
             this.reset_game();
             this.update_button_ui();
+            
         }
    }
 
@@ -1034,19 +1117,23 @@ export class Txstage extends Entity {
                 // Somebody join me    
                 // Reason for using emitBus is because we dont want to use messageBus to send in onData handler. 
                 // We let the update() to send instead.
-                _this.emitBus.push( [ "join_resp" , info.userID ] );
-                _this.emitBus.push( [ "gametaken" ] );
+                if ( _this.opponent == "" ) { 
+                    _this.emitBus.push( [ "join_resp" , info.userID ] );
+                    _this.emitBus.push( [ "gametaken" ] );
 
 
-                _this.opponent = info.userID;
-                _this.game_mode = 2;
-                _this.menu_page = 1;
-                _this.playerindex = 1;
+                    _this.opponent = info.userID;
+                    _this.game_mode = 2;
+                    _this.menu_page = 1;
+                    _this.playerindex = 1;
 
                 
-                this.rearrange_cards_collection();
-                this.update_button_ui();
+                    _this.rearrange_cards_collection();
+                    _this.update_button_ui();
 
+                } else {
+                    _this.emitBus.push( [ "join_reject" , info.userID ] );
+                }
 
                 
             }
@@ -1064,8 +1151,20 @@ export class Txstage extends Entity {
                 _this.menu_page = 1;
                 _this.playerindex = -1;
                
-                this.rearrange_cards_collection();
-                this.update_button_ui();
+                _this.rearrange_cards_collection();
+                _this.update_button_ui();
+
+            }
+        });
+
+        this.messageBus.on("join_reject", (info: EmitArg) => {
+
+            // Host resp my join
+            if ( this.userID != info.userID  && this.userID == info.recipient ) {
+                
+                log("bus: join_reject", info );
+                _this.menu_page = 3;
+                _this.update_button_ui();
 
             }
         });
@@ -1106,16 +1205,54 @@ export class Txstage extends Entity {
 
         this.messageBus.on("leave", (info: EmitArg) => {
             if ( this.userID != info.userID    && this.userID == info.recipient  ) {
+                
                 log("bus: leave", info );
-                /*
-                _this.show_status_msg(  info.userID + " left the game. You won." );
-                _this.isHost = 0;
-                _this.isClient = 0;
+                
+
+                if ( this.game_state == 0 ) {
+                    
+                    // Opponent left at menu stage, i m still host can take other opponent
+                    
+                    if ( _this.isHost == 1 ) {
+                        _this.menu_page = 4;
+                        _this.update_button_ui();
+                        _this.emitBus.push( [ "iamhost" ] );
+                        _this.menu_labels["lbl1"].getComponent( TextShape ).value = info.userID + " left. Waiting for another challenger...." ;
+                    
+                    } else { 
+                        _this.menu_page = 3;
+                        _this.update_button_ui();
+                         _this.menu_labels["lbl1"].getComponent( TextShape ).value = info.userID + " has left. Host or Join Game." ;
+                    
+                    } 
+
+                } else if ( _this.game_state == 1 ) {
+
+                    if ( _this.opponent == info.userID ) {
+                        if ( _this.playerindex == 1 ) {
+                            _this.score_r = 4;
+                        } else {
+                            _this.score_b = 4;
+                        }
+                        _this.endgame();
+                        _this.uitxt_instruction.value = "Opponent has cowardly left the game. You won ";
+                    }
+                }
                 _this.opponent = "";
-                _this.turn = this.userID;
-                _this.refresh_turn_info();
-                _this.cancelPage();
-                */
+                _this.isOpponentReady = 0;
+                
+            }
+        });
+
+
+        this.messageBus.on("iamready", (info: EmitArg) => {
+
+            if ( this.userID != info.userID    && this.userID == info.recipient  ) {
+                    
+                log("bus: iamready", info );
+                _this.isOpponentReady = 1;
+                _this.check_both_ready("confirm");
+
             }
         });
 
@@ -1240,7 +1377,8 @@ export class Txstage extends Entity {
 
 
 
-
+    //-------------
+    // Bookmark endgame
     endgame( ) {
     
         this.sounds["endgame"].playOnce();
