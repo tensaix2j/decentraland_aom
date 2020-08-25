@@ -47,8 +47,8 @@ export class MainClass {
             "stage", 
             userID , 
             {
-				position: new Vector3( 8, 0, 8),
-				scale   : new Vector3( 1, 1, 1 )
+				position: new Vector3( 9.2, 0, 8),
+				scale   : new Vector3( 1, 1, 0.95 )
 		    }, 
             camera 
         );

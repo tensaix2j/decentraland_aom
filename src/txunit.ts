@@ -216,6 +216,7 @@ export class Txunit extends Entity {
    			
 			this.stopAnimation("_idle");
 			this.stopAnimation("Punch");
+			this.stopAnimation("Die");
 			this.playAnimation("Walking", 1 );
    			//log( this.id , "createAnimationStates" );	
 
@@ -381,6 +382,7 @@ export class Txunit extends Entity {
 			
 			this.stopAnimation("Walking");
 			this.stopAnimation("Punch");
+			this.stopAnimation("_idle");
 			this.playAnimation("Die", 0 );
 
 			this.dead = 1;
@@ -474,7 +476,7 @@ export class Txunit extends Entity {
 
 						this.stopAnimation("Walking" );	
 						this.stopAnimation("_idle" );	
-						
+						this.stopAnimation("Die");
 						this.playAnimation("Punch", 0 );
 						this.lookat_target( diff_x , diff_z );
 							
@@ -563,6 +565,7 @@ export class Txunit extends Entity {
 					
 					this.stopAnimation("Punch");
 					this.stopAnimation("_idle");
+					this.stopAnimation("Die");
 					this.playAnimation("Walking", 1 );
 
 				}
@@ -615,7 +618,7 @@ export class Txunit extends Entity {
 
 				this.stopAnimation("Punch");
 				this.stopAnimation("_idle");
-					
+				this.stopAnimation("Die");	
 				this.playAnimation("Walking", 1 );
 
 

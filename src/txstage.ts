@@ -761,7 +761,7 @@ export class Txstage extends Entity {
             this.animate_button_callback_id = id;
             this.sounds["buttonclick"].playOnce();
             this.globaltick = 0;
-            
+
 
         } else {
             if ( this.isReady == 1 ) {
@@ -1780,7 +1780,7 @@ export class Txstage extends Entity {
         this.ui3d_root.setParent( this );
         this.ui3d_root.addComponent( new Transform(
             {   
-                position: new Vector3( -8 , 4 , 0 )
+                position: new Vector3( -6.5 , 4.5 , 0 )
             }
         ) );
         this.ui3d_root.addComponent( new Billboard() );
@@ -1830,7 +1830,8 @@ export class Txstage extends Entity {
             0,
             this,
             {
-                position: new Vector3(0,8,0)
+                position: new Vector3(0, 7 , 0),
+                scale   : new Vector3(0.8,0.8,0.8)
             }
         )
 
