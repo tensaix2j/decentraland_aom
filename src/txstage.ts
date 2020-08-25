@@ -126,6 +126,7 @@ export class Txstage extends Entity {
     public isOpponentReady = 0;
 
 
+    
 
     public debugsetting = 0;
 
@@ -384,8 +385,6 @@ export class Txstage extends Entity {
             }
             this.messageBus.emit( msg[0], params );
         }
-
-            
 
     }
 
@@ -1696,6 +1695,12 @@ export class Txstage extends Entity {
 
     public all_available_cards_isspell = [ 0 , 0 , 0 , 0 ,    0 , 0, 0, 0,     1 , 1 ,0, 0,    0, 0, 0, 0 ];
 
+    public all_available_cards_modelname = [ 
+        "skeleton", "giant" , "knight", "archer" , 
+        "wizard" , "goblin" , "gargoyle" , "gargoyle", 
+        "","", "goblinhut", "tombstone", 
+        "hogrider", "prince", "goblinspear" ,"pekka" 
+    ];
 
      //----
     init_player_cards_collection() {
@@ -1734,7 +1739,7 @@ export class Txstage extends Entity {
         
 
         // Individual cards
-        for ( i = 0 ; i < 16 ; i++ ) {
+        for ( i = 0 ; i < this.all_available_cards.length ; i++ ) {
 
             let x = (( i % 4 ) - 2 ) * 1.2;
             let y = ((i / 4)  >> 0 ) * 1.2;
@@ -1742,6 +1747,7 @@ export class Txstage extends Entity {
 
             let card_type = this.all_available_cards[i];
             let card_mana = this.all_available_cards_mana[i];
+            let modelname = this.all_available_cards_modelname[i];
 
             let txcard = new Txcard(
                 i ,
@@ -1753,7 +1759,8 @@ export class Txstage extends Entity {
                 card_type,
                 this,
                 card_sel_highlight_material,
-                card_mana
+                card_mana,
+                modelname
             );
 
             txcard.isSpell = this.all_available_cards_isspell[i] ;
@@ -1761,8 +1768,24 @@ export class Txstage extends Entity {
 
 
             this.player_cards_collection.push( txcard );
+
+
+             // Pre-load so that later can visible faster.
+            let preview_model = new Entity();
+            preview_model.setParent( this );
+            preview_model.addComponent( new Transform(
+                {
+                    position: new Vector3( 0, -999 , 0 ),
+                    scale   : new Vector3( 0.5,0.5,0.5)
+                }
+            ));
+            if ( modelname != "" ) {
+                preview_model.addComponent( resources.models[modelname] );
+            }
+
         }
 
+       
         
 
      }
@@ -1826,15 +1849,21 @@ export class Txstage extends Entity {
 
 
 
+       
+
+
+
+
+
         this.scoreboard = new Txscoreboard(
             0,
             this,
             {
-                position: new Vector3(0, 7 , 0),
-                scale   : new Vector3(0.8,0.8,0.8)
+                position: new Vector3( -4 ,10 , 0),
+                scale   : new Vector3( 1 , 1 , 1 ),
             }
         )
-
+        this.scoreboard.getComponent(Transform).rotation.eulerAngles = new Vector3(0, 90 , 0 );
 
 
         this.init_buttons();

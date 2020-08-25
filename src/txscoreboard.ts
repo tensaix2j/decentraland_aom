@@ -27,7 +27,7 @@ export class Txscoreboard extends Entity {
 		this.transform =  new Transform( transform_args );
 		this.addComponent( resources.models.scoreboard );
 		this.addComponent( this.transform );
-		this.addComponent( new Billboard() );
+		//this.addComponent( new Billboard() );
 		
 		let scorenumber_r = new Entity();
 		scorenumber_r.setParent( this );

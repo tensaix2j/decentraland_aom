@@ -15,8 +15,9 @@ export class Txcard extends Entity {
 	public manaCost = 31;
 	public isSelected = 0;
 	public card_sel_highlight;
+	public model;
 
-	constructor( id, parent , transform_args, type , stage , highlight_material , manaCost  ) {
+	constructor( id, parent , transform_args, type , stage , highlight_material , manaCost , model  ) {
 
 		super();
 		engine.addEntity(this);
@@ -27,7 +28,7 @@ export class Txcard extends Entity {
 		this.type = type;
 		this.stage = stage;
 		this.manaCost = manaCost;
-
+		this.model = model;
 		this.transform = new Transform( transform_args );
 
 		let card_shape = new PlaneShape();
