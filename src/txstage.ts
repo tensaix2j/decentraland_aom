@@ -124,7 +124,7 @@ export class Txstage extends Entity {
     public available_gamehosts = {}    
     public isReady      = 0;
     public isOpponentReady = 0;
-
+    public synctick     = 0;
 
     
 
@@ -231,6 +231,9 @@ export class Txstage extends Entity {
     //-------------
     debug( ) {
 
+
+        this.debugsetting = 0;
+
         if ( this.debugsetting == 1 ) {
 
             //this.card_input_down( null, this.player_cards_collection[3] );
@@ -248,8 +251,50 @@ export class Txstage extends Entity {
                 u.speed = 0;
             }
             */
+
+            //case 3 knight vs pekka wont progress 
             /*
-            let u = this.createUnit( "goblin",  3 ,  -4 , -1, 0 );
+            let u = this.createUnit( "pekka",  -3 ,  -1.6 , 1, 0 );
+            u.curhp = 1000000;
+            u.maxhp = 1000000;
+
+            u = this.createUnit( "knight",  -3 , 1.2 ,  -1, 0 );
+            */
+
+
+
+
+            /*
+            // Case 1: attack too fast bug    
+            let u = this.createUnit( "knight",  -3 ,  0 , -1, 0 );
+            u.curhp = 1000000;
+            u.maxhp = 1000000;
+
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3.1 , 0.19 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -2.9 , 0.21 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3.11 , 0.19 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -2.89 , 0.21 ,  1, 0 );
+            */
+
+
+            /*
+            // Case 2 pushing around
+            let u = this.createUnit( "pekka",  -3 ,  0 , -1, 0 );
+            u.curhp = 1000000;
+            u.maxhp = 1000000;
+
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );
+            u = this.createUnit( "skeleton",  -3 , 0.2 ,  1, 0 );    
+            */
+
+
+
+
+            /*
             u.curhp = 100000;
             u.maxhp = 100000;
             u.speed = 0;
@@ -258,21 +303,28 @@ export class Txstage extends Entity {
             this.units[4].maxhp = 1000000;
             */
 
+
             for ( i = 0 ; i < this.player_cards_collection.length ; i++ ) {
                 this.player_cards_in_use.push(  this.player_cards_collection[i] );
             }
 
             this.time_remaining = 1000000;
             this.cards_dealt_in_game = 16;
+            
+            this.game_state = 1;
+
+
             this.rearrange_cards_selected();
             this.update_button_ui();
 
 
+            /*
             this.game_state = 2;
             this.score_b = 2;
             this.score_r = 2;
 
             this.endgame();
+            */
 
             //this.units[0].curhp = 1;
             
@@ -358,6 +410,19 @@ export class Txstage extends Entity {
             
             if ( this.game_mode == 1 && this.game_state == 1  ) {
                 this.aibot.update();
+            
+            } else if ( this.game_mode == 2 && this.game_state == 1 ) {
+
+                this.synctick += 1;
+                if ( this.synctick > 100 ) {    
+                    let params  = {
+                        userID      : this.userID,
+                        recipient   : this.opponent,
+                        data: [ this.globaltick, this.time_remaining ]
+                    }
+                    this.messageBus.emit( "sync", params );
+                    this.synctick = 0;
+                }
             }
 
         } 
@@ -786,7 +851,7 @@ export class Txstage extends Entity {
                     this.uiimg_redflag.positionX   = -100 + animate_delta * 40;
                     this.uiimg_blueflag.positionX  =  100 - animate_delta * 40;
                     this.uitxt_instruction.fontSize = 80 - animate_delta  * 2 ;
-                         
+                    this.ui3d_root.getComponent( Transform ).position.y = -999;      
                 } else {
                     this.ui3d_root.getComponent( Transform ).position.y -= 0.35;
                 }
@@ -804,10 +869,10 @@ export class Txstage extends Entity {
                     this.uitxt_instruction.fontSize = 16;
                     this.uitxt_instruction.value = "";
 
-                } else {
-                    this.ui3d_root.getComponent( Transform ).position.y = 4;
-                }
-
+                } 
+                
+                this.ui3d_root.getComponent( Transform ).position.y = 4.5;
+                
                 let use_id = this.animate_button_callback_id;
                 let userData = this.animate_button_userdata;
 
@@ -856,6 +921,7 @@ export class Txstage extends Entity {
             this.game_mode = 2;
             this.opponent = "";
             this.isOpponentReady = 0;
+            this.isReady = 0;
 
             this.update_button_ui();
 
@@ -875,6 +941,7 @@ export class Txstage extends Entity {
             this.game_mode = 2;
             this.opponent = "";
             this.isOpponentReady = 0;
+            this.isReady = 0;
 
             this.update_button_ui();
 
@@ -967,12 +1034,12 @@ export class Txstage extends Entity {
             this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Red();
             this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Blue();
 
-            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 1 )
-            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.5 )
-            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 1 )
+            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 0.5 )
+            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.3 )
+            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 0.5 )
             
-            this.menu_labels["lbl2"].getComponent( Transform ).position.y = 3.25
-            this.menu_labels["lbl3"].getComponent( Transform ).position.y = 2.25
+            this.menu_labels["lbl2"].getComponent( Transform ).position.y = 3.65
+            this.menu_labels["lbl3"].getComponent( Transform ).position.y = 3.00
                     
 
         } else if ( id == "leavegame" ) {
@@ -981,12 +1048,12 @@ export class Txstage extends Entity {
             this.menu_page = 0;
             this.uitxt_instruction.value = "";
 
-            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 0.3 )
-            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.3 )
-            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 0.3 )
+            this.menu_labels["lbl1"].getComponent( Transform ).scale.setAll( 0.25 )
+            this.menu_labels["lbl2"].getComponent( Transform ).scale.setAll( 0.25 )
+            this.menu_labels["lbl3"].getComponent( Transform ).scale.setAll( 0.25 )
             
-            this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Black();
-            this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Black();
+            this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.White();
+            this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.White();
 
             this.menu_labels["lbl2"].getComponent( Transform ).position.y = 3.9;
             this.menu_labels["lbl3"].getComponent( Transform ).position.y = 3.55;
@@ -1257,28 +1324,57 @@ export class Txstage extends Entity {
 
         this.messageBus.on("gamecmd", (info: EmitArg) => {
 
-            log("bus: gamecmd", info );
+            if ( this.userID == info.userID  || this.opponent == info.userID  ) {
+                log("bus: gamecmd", info );
 
-            let emit_data  = info.data;
-            if ( emit_data[0] == "spawnUnit" ) {
+                let emit_data  = info.data;
+                if ( emit_data[0] == "spawnUnit" ) {
 
-                let spawn_absolute_tick = emit_data[5];
-                let wait_buffer         = spawn_absolute_tick - _this.globaltick;
+                    let spawn_absolute_tick = emit_data[5];
+                    let wait_buffer         = spawn_absolute_tick - _this.globaltick;
 
 
-                if ( wait_buffer < 0 ) {
-                    // Missed out the spawn absolute tick..We are way too late
-                    wait_buffer = 0;
+                    if ( wait_buffer < 0 ) {
+                        // Missed out the spawn absolute tick..We are way too late
+                        wait_buffer = 0;
+                    }
+                    if ( wait_buffer > 40 ) {
+                        // We are way too ahead..
+                        wait_buffer = 40;
+                    }
+
+                    log("recv spawn cmd:", emit_data[1], "now ",this.globaltick , "tospawn_at", spawn_absolute_tick  );
+
+                    _this.spawnUnit( 
+                        emit_data[1],
+                        emit_data[2],
+                        emit_data[3],
+                        emit_data[4],
+                        wait_buffer
+                    );
+                }    
+            }
+        });
+
+        this.messageBus.on("sync", (info: EmitArg) => {
+
+            if ( this.userID != info.userID    && this.userID == info.recipient  ) {
+                log("bus: sync", info );
+
+                let oppo_globaltick     = info.data[0];
+                let oppo_time_remaining  = info.data[1];
+                if ( _this.globaltick < oppo_globaltick ) {
+                    
+                    log( "Syncing my globaltick to opponent's globaltick", _this.globaltick , oppo_globaltick );
+                    _this.globaltick = oppo_globaltick;
+
                 }
-                _this.spawnUnit( 
-                    emit_data[1],
-                    emit_data[2],
-                    emit_data[3],
-                    emit_data[4],
-                    wait_buffer
-                );
-            }    
-            
+                if ( _this.time_remaining > oppo_time_remaining ) {
+                    log("Syncing my time_remaining to opponent's time rem", _this.time_remaining, oppo_time_remaining);
+                    _this.time_remaining = oppo_time_remaining;
+                }
+                    
+            }
         });
 
     }
@@ -1304,6 +1400,8 @@ export class Txstage extends Entity {
 
             let spawn_absolute_tick = this.globaltick + 15;
             cmd_arr[5] = spawn_absolute_tick ;          
+
+            //log( "spawn_absolute_tick ", cmd_arr[1] , spawn_absolute_tick );
             
             let params  = {
                 userID      : this.userID,
@@ -1806,7 +1904,53 @@ export class Txstage extends Entity {
                 position: new Vector3( -6.5 , 4.5 , 0 )
             }
         ) );
+
+        // HEre doesn''t control , go to update_button_ui
         this.ui3d_root.addComponent( new Billboard() );
+
+
+        let backboard = new Entity();
+        backboard.setParent( this.ui3d_root );
+        backboard.addComponent( new BoxShape() );
+        backboard.addComponent( new Transform( 
+            {
+                position: new Vector3( 0 , 1 , -1  ),
+                scale   : new Vector3( 7.4, 9,  0.1 ) 
+            }
+        ));
+        let material = new Material();
+        material.albedoColor = Color3.FromInts(102, 77, 51);
+        backboard.addComponent( material );
+
+        let logo = new Entity();
+
+
+        logo.setParent( this.ui3d_root );
+        logo.addComponent( new PlaneShape() );
+        logo.addComponent( new Transform( 
+            {
+                position: new Vector3( 0 , 6, -0.5 ),
+                scale   : new Vector3( 5,  5, 5 )
+            }
+        ));
+        material = new Material();
+        material.albedoTexture = resources.textures.logo;
+        material.specularIntensity = 0;
+        material.roughness = 1;
+        material.transparencyMode = 2;
+        logo.addComponent( material );
+        logo.getComponent( PlaneShape ).uvs = [
+            0, 0 ,
+            1, 0 ,
+            1, 1 ,
+            0, 1 ,
+            0, 0 ,
+            1, 0 ,
+            1, 1 ,
+            0, 1 ,
+        ];
+
+
 
 
         this.menu_labels["lbl1"] = new Entity();
@@ -1814,10 +1958,10 @@ export class Txstage extends Entity {
         this.menu_labels["lbl1"].addComponent( new Transform(
             {
                 position:new Vector3( 0,  4.25 , 0 ),
-                scale   :new Vector3( 0.3, 0.3, 0.3 )
+                scale   :new Vector3( 0.25, 0.25, 0.25 )
             }
         ));
-        this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl1"].getComponent( TextShape ).color = Color3.White();
         this.menu_labels["lbl1"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
         this.menu_labels["lbl1"].setParent( this.ui3d_root );
 
@@ -1827,10 +1971,10 @@ export class Txstage extends Entity {
         this.menu_labels["lbl2"].addComponent( new Transform(
             {
                 position:new Vector3( 0,  3.9 , 0 ),
-                scale   :new Vector3( 0.3, 0.3, 0.3 )
+                scale   :new Vector3( 0.25, 0.25, 0.25 )
             }
         ));
-        this.menu_labels["lbl2"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl2"].getComponent( TextShape ).color = Color3.White();
         this.menu_labels["lbl2"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
         this.menu_labels["lbl2"].setParent( this.ui3d_root );
 
@@ -1840,10 +1984,10 @@ export class Txstage extends Entity {
         this.menu_labels["lbl3"].addComponent( new Transform(
             {
                 position:new Vector3( 0,  3.55 , 0 ),
-                scale   :new Vector3( 0.3, 0.3, 0.3 )
+                scale   :new Vector3( 0.25, 0.25, 0.25 )
             }
         ));
-        this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.Black();
+        this.menu_labels["lbl3"].getComponent( TextShape ).color = Color3.White();
         this.menu_labels["lbl3"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
         this.menu_labels["lbl3"].setParent( this.ui3d_root );
 
@@ -1859,7 +2003,7 @@ export class Txstage extends Entity {
             0,
             this,
             {
-                position: new Vector3( -4 ,10 , 0),
+                position: new Vector3( -4 ,11 , 0),
                 scale   : new Vector3( 1 , 1 , 1 ),
             }
         )
@@ -1881,7 +2025,7 @@ export class Txstage extends Entity {
             "Single Player" , 
             "singleplayer",
             {
-                position: new Vector3( 0, 1,  0),
+                position: new Vector3( 0, 1.5,  0),
                 scale   : new Vector3(0.5,0.5,0.5)
             },
             this.ui3d_root,
@@ -1894,7 +2038,7 @@ export class Txstage extends Entity {
             "Multi Player",
             "multiplayer", 
             {
-                 position: new Vector3( 0, 0 ,  0),
+                 position: new Vector3( 0, 0.5 ,  0),
                  scale   : new Vector3(0.5,0.5,0.5)
             },
             this.ui3d_root,
@@ -2940,7 +3084,7 @@ export class Txstage extends Entity {
     //---------------------
     createUnit( type , x, z , owner, wait_buffer  ) {
 
-    	log( "createUnit" , type, owner, "wait for", wait_buffer, "gtick", this.globaltick );
+    	//log( "createUnit" , type, owner, "wait_buffer", wait_buffer, "gtick", this.globaltick );
 
     	let y ;
     	let modelsize;
@@ -2974,7 +3118,7 @@ export class Txstage extends Entity {
     		model 		= resources.models.skeleton;
 
             damage      = 67;
-            maxhp       = 67;
+            maxhp       = 90;
             attackSpeed = 30;
 
             speed       = 6;
@@ -2990,10 +3134,10 @@ export class Txstage extends Entity {
     		model 		= resources.models.giant;
 
             damage      = 211;
-            maxhp       = 3275;
+            maxhp       = 4175;
             attackSpeed = 45;
 
-            speed       = 6;
+            speed       = 4.5;
 
             healthbar_y = 4;
             attack_building_only = 1;
@@ -3168,7 +3312,7 @@ export class Txstage extends Entity {
             damage      = 678;
             maxhp       = 3125;
             attackSpeed = 54;
-            speed       = 6;
+            speed       = 4.5;
             healthbar_y = 5.5;
 
             attackRange = 0.62;
@@ -3493,6 +3637,9 @@ export class Txstage extends Entity {
         fixDef.density      = 20;
         fixDef.friction     = 100;
         fixDef.restitution  = 0.3;
+        fixDef.linearDamping = 0;
+
+
         fixDef.shape        = new b2CircleShape(radius);
         
         let b2body = world.CreateBody(bodyDef);

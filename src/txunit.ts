@@ -241,6 +241,7 @@ export class Txunit extends Entity {
 	
 
 	//------------------
+	// Bookmark
 	update( dt ) {
 
 
@@ -342,6 +343,11 @@ export class Txunit extends Entity {
 	    		this.box2dbody.SetLinearVelocity( new b2Vec2( delta_x ,delta_z ) );
 
 	    		this.transform.rotation.eulerAngles = new Vector3( 0, deg ,0) ;
+
+	    		this.getComponent(Animator).getClip("Punch").playing = false;
+				this.getComponent(Animator).getClip("Walking").playing = true;
+
+
 
 	    	
 	    	} else {
@@ -449,8 +455,10 @@ export class Txunit extends Entity {
 									
 
 				if ( hyp >  use_attackRange * use_attackRange ) {
+
 					// attack target not in range. need not to do anything.
 					this.attacking = 0;
+					//this.attacktarget = null ;
 
 					if ( this.walking_queue.length == 0 ) {
 						this.find_path_to_target();
@@ -463,9 +471,10 @@ export class Txunit extends Entity {
 						// Attack target is in attack range, attack now.
 						this.walking_queue.length = 0;
 						this.box2dbody.SetLinearVelocity( new b2Vec2(0,0) );
-						this.attacking = 1;
+						this.attacking = this.attackSpeed;
 						this.tick = this.attackSpeed;
-						
+
+
 							
 					}
 
@@ -538,6 +547,9 @@ export class Txunit extends Entity {
 								this.parent.sounds["punch"].playOnce();
 							}
 
+							this.box2dbody.SetLinearVelocity( new b2Vec2(0,0 ) );
+							this.box2dbody.ApplyLinearImpulse( new b2Vec2(0.001,  0) , this.box2dbody.GetWorldCenter() );
+
 							// Melee
 							this.inflict_damage();
 						}
@@ -557,22 +569,29 @@ export class Txunit extends Entity {
 			} else {
 				// has attack target, but attack target isdead .
 
-				this.attacktarget = null;
-				this.movetarget = null;
-				this.walking_queue.length = 0;
-				this.attacking = 0;
-				if ( this.shapetype == "dynamic" ) {
-					
-					this.stopAnimation("Punch");
-					this.stopAnimation("_idle");
-					this.stopAnimation("Die");
-					this.playAnimation("Walking", 1 );
+				if ( this.attacking > 0 ) {
+					this.attacking -= 1;
 
+				} else {
+					this.attacktarget = null;
+					this.movetarget = null;
+					this.walking_queue.length = 0;
+					this.attacking = 0;
+					if ( this.shapetype == "dynamic" ) {
+						
+						this.stopAnimation("Punch");
+						this.stopAnimation("_idle");
+						this.stopAnimation("Die");
+						this.playAnimation("Walking", 1 );
+
+					}
 				}
 
 			}
 		} else {
-			this.attacking = 0;
+			if ( this.attacking > 0 ) {
+				this.attacking -= 1;
+			}
 		}
 
 	}
@@ -614,13 +633,8 @@ export class Txunit extends Entity {
 				this.attacktarget.die();
 				this.attacktarget = null;
 				this.movetarget   = null;
-				this.attacking = 0;
 
-				this.stopAnimation("Punch");
-				this.stopAnimation("_idle");
-				this.stopAnimation("Die");	
-				this.playAnimation("Walking", 1 );
-
+				
 
 			}
 		}
@@ -689,7 +703,9 @@ export class Txunit extends Entity {
 		if ( this.attacktarget == null ) {
 			
 			//log( "units_in_proximity", this.units_in_proximity.length );	
+				
 			
+
 			this.find_nearby_units( this.aggroRange );
 			
 
@@ -740,7 +756,9 @@ export class Txunit extends Entity {
 				this.attacktarget = nearest_u;
 				this.movetarget   = this.attacktarget;
 
+
 				//log( this.id, "new target found" , this.attacktarget.id );
+				
 				this.find_path_to_target();
 			}
 
@@ -960,8 +978,8 @@ export class Txunit extends Entity {
     	}
     	
     	clip.reset();
-		clip.play();
-	
+		clip.playing = true;
+		
 		
     }
 
@@ -976,7 +994,7 @@ export class Txunit extends Entity {
 		} else {
 			clip = this.getComponent(Animator).getClip(action_name);
     	}
-    	clip.stop();
+    	clip.playing = false;
     	
     }
 	

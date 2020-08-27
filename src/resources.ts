@@ -52,7 +52,8 @@ export default {
 		manaruler: new Texture("models/manaruler.png"),
 
 		redflag: new Texture("models/redflag.png"),
-		blueflag: new Texture("models/blueflag.png")
+		blueflag: new Texture("models/blueflag.png"),
+		logo : new Texture("models/logo.png")
 		
 
 	},
