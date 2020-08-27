@@ -4,15 +4,16 @@
     "favicon": "favicon_asset"
   },
   "contact": {
-    "name": "author-name",
-    "email": ""
+    "name": "tensaix2j",
+    "email": "tensaix2j@gmail.com"
   },
   "owner": "",
   "scene": {
     "parcels": [
-      "0,0"
+      "65,30",
+      "66,30"
     ],
-    "base": "0,0"
+    "base": "66,30"
   },
   "communications": {
     "type": "webrtc",
@@ -31,14 +32,14 @@
       "name": "spawn1",
       "default": true,
       "position": {
-        "x": 0,
-        "y": 0,
-        "z": 0
+        "x": 15.2,
+        "y": 4,
+        "z": 7.2
       },
       "cameraTarget": {
-        "x": 8,
-        "y": 1,
-        "z": 8
+        "x": 0,
+        "y": 10,
+        "z": 7.2
       }
     }
   ]
