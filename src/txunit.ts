@@ -108,7 +108,7 @@ export class Txunit extends Entity {
 			position: new Vector3(  0,    healthbar_y,   0),
 			scale   : new Vector3(1.5,   0.2,   0.2)
 		}));
-		healthbar.addComponent( new Billboard() );
+		healthbar.addComponent( this.parent.shared_billboard );
 		healthbar.addComponent( healthbar_material );
 
 		this.healthbar = healthbar;
@@ -153,7 +153,7 @@ export class Txunit extends Entity {
 				position: new Vector3( 0 , healthbar_y  , 0.1 * this.owner ),
 				scale : new Vector3( 0.15, 0.15, 0.15)
 			}));
-			healthbarnumber.addComponent(new Billboard() );
+			healthbarnumber.addComponent( this.parent.shared_billboard );
 			this.healthbarnumber = healthbarnumber;
 		}
 
@@ -332,7 +332,7 @@ export class Txunit extends Entity {
 	    	
 	    	var hyp = diff_x * diff_x + diff_z * diff_z ;
 
-	    	if ( hyp > this.speed * this.speed * dt * dt  ) {
+	    	if ( hyp > 0.25  ) {
 	    		
 	    		
 	    		var rad	 = Math.atan2( diff_x, diff_z );
@@ -642,43 +642,45 @@ export class Txunit extends Entity {
 	
 	//------------------
 	reinstate_box2d( box2d_transform_args ) {
-
-		if ( this.shapetype == "static" ) {
-			this.box2dbody = this.parent.createStaticCircle(  
-	    				this.transform.position.x ,  
-	    				this.transform.position.z ,  
-	    				box2d_transform_args.scale.x , 
-	    				this.parent.world,
-	    				false 
-	    	);
-
-
-		} else {
-			this.box2dbody = this.parent.createDynamicCircle(  
-	    				this.transform.position.x ,  
-	    				this.transform.position.z ,  
-	    				box2d_transform_args.scale.x , 
-	    				this.parent.world, 
-	    				false 
-	    	);
-
-	    }
-	   	this.box2dbody.m_userData = this ;
-
-
-	   	// Box2d's collision grouping
-    	let categoryBits = 1;
-    	let maskBits 	 = 1;
-
-	   	if ( this.isFlying == 1 ) {
-    		categoryBits = 2;
-    		maskBits     = 2;
-    	}
-    	this.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
-		this.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
-
-	   	this.updatePosition_toBox2d();
 		
+		if ( this.parent.game_state == 1 ) {
+			if ( this.shapetype == "static" ) {
+				this.box2dbody = this.parent.createStaticCircle(  
+		    				this.transform.position.x ,  
+		    				this.transform.position.z ,  
+		    				box2d_transform_args.scale.x , 
+		    				this.parent.world,
+		    				false 
+		    	);
+
+
+			} else {
+				this.box2dbody = this.parent.createDynamicCircle(  
+		    				this.transform.position.x ,  
+		    				this.transform.position.z ,  
+		    				box2d_transform_args.scale.x , 
+		    				this.parent.world, 
+		    				false 
+		    	);
+
+		    }
+		   	this.box2dbody.m_userData = this ;
+
+
+		   	// Box2d's collision grouping
+	    	let categoryBits = 1;
+	    	let maskBits 	 = 1;
+
+		   	if ( this.isFlying == 1 ) {
+	    		categoryBits = 2;
+	    		maskBits     = 2;
+	    	}
+	    	this.box2dbody.m_fixtureList.m_filter.categoryBits = categoryBits;
+			this.box2dbody.m_fixtureList.m_filter.maskBits     = maskBits;
+
+		   	this.updatePosition_toBox2d();
+			
+		}	
 	}
 
 

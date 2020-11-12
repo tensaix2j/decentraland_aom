@@ -1,6 +1,6 @@
 {
   "display": {
-    "title": "interactive-text",
+    "title": "Mana Royale",
     "favicon": "favicon_asset"
   },
   "contact": {
@@ -10,7 +10,6 @@
   "owner": "",
   "scene": {
     "parcels": [
-      "65,30",
       "66,30"
     ],
     "base": "66,30"
@@ -33,12 +32,12 @@
       "default": true,
       "position": {
         "x": 15.2,
-        "y": 4,
+        "y": 0,
         "z": 7.2
       },
       "cameraTarget": {
         "x": 0,
-        "y": 10,
+        "y": 0,
         "z": 7.2
       }
     }

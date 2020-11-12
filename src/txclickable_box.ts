@@ -65,7 +65,7 @@ export class Txclickable_box extends Entity {
 		this.text_shape 		 = new TextShape( lbl );
 		this.text_shape.color    = Color3.White();
 		this.text_transform  = new Transform({
-			position : new Vector3 ( 0,  0 , 0.52 ), 
+			position : new Vector3 ( 0,  0 , 0.3 ), 
     		scale    : new Vector3 ( 0.5,  0.5,  0.5 )
 		});
 		this.text_transform.rotation.eulerAngles = new Vector3(0,180,0);

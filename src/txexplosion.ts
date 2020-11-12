@@ -68,7 +68,7 @@ export class Txexplosion extends Entity {
 		this.visible_ypos = this.getComponent(Transform).position.y;
 
 		if ( type == 1 ) {
-			this.addComponent( new Billboard() );
+			this.addComponent( this.parent.shared_billboard );
 		} else if ( type == 2 ) {
 			this.transform.rotation.eulerAngles = new Vector3( 90, 0 , 0 );
 			this.maxframe = 6;

@@ -29,6 +29,9 @@ import { Txsound } from "src/txsound";
 import { EmitArg } from "src/txemit_args";
 import { TxAIBot } from "src/txaibot";
 
+import {Utils} from "src/utils"
+import { getUserAccount, RPCSendableMessage  } from '@decentraland/EthereumController'
+
 
 export class Txstage extends Entity {
 
@@ -55,6 +58,8 @@ export class Txstage extends Entity {
     public shared_explosion_material;
     public shared_clock_material;
     public shared_zap_material;
+    public shared_billboard;
+
 
 
 
@@ -71,6 +76,10 @@ export class Txstage extends Entity {
 
     public score_r = 0;
     public score_b = 0;
+
+    public yourscore = 1000;
+
+
     public time_remaining = 180;
     public sudden_death = 0;
 
@@ -195,7 +204,6 @@ export class Txstage extends Entity {
        
 
 
-        this.init_castles();
         this.init_ui_2d();
         this.init_ui_3d();
         this.init_shared_material();
@@ -204,6 +212,11 @@ export class Txstage extends Entity {
         this.init_MessageBus();
         this.init_aibot();
         this.update_button_ui();
+
+
+
+        this.init_castles();
+        
 
         this.debug();
 
@@ -556,6 +569,9 @@ export class Txstage extends Entity {
             
                 this.buttons["singleplayer"].show();
                 this.buttons["multiplayer"].show();
+
+                this.displayHighscores();
+
             
             } else if ( this.menu_page == 1  ) {
 
@@ -853,7 +869,7 @@ export class Txstage extends Entity {
                     this.uitxt_instruction.fontSize = 80 - animate_delta  * 2 ;
                     this.ui3d_root.getComponent( Transform ).position.y = -999;      
                 } else {
-                    this.ui3d_root.getComponent( Transform ).position.y -= 0.35;
+                    this.ui3d_root.getComponent( Transform ).position.y -= 0.75;
                 }
 
                 this.animate_button_tick -= 1;
@@ -1482,16 +1498,21 @@ export class Txstage extends Entity {
 
         this.game_state = 2;
         let final_txt = "Game Over.\n";
+        let final_res = "draw";
+
         if ( this.score_r > this.score_b ) {
         
             final_txt += "Red Wins!";
             this.uiimg_redflag.visible = true;
-            
+            final_res = "r";
+
 
         } else if ( this.score_r < this.score_b ) {
             final_txt += "Blue Wins!";
             this.uiimg_blueflag.visible = true;
-            
+            final_res = "b";
+                        
+
         } else {
 
             let i;
@@ -1514,8 +1535,12 @@ export class Txstage extends Entity {
             if ( smallest_r < smallest_b ) {
                 final_txt += "Tie Breaker: Blue Wins!";
                 this.uiimg_blueflag.visible = true;
+                final_res = "b";
+            
             } else if ( smallest_b < smallest_r ) {
                 final_txt += "Tie Breaker: Red Wins!";
+                final_res = "r";
+            
                 this.uiimg_redflag.visible = true;
             
             } else {
@@ -1533,6 +1558,19 @@ export class Txstage extends Entity {
 
         this.update_score();
         this.update_button_ui();
+
+        if ( final_res != "draw" ) {
+            if ( final_res == "r" && this.playerindex == 1 ) {
+                this.yourscore += 30;
+            } else if ( final_res == "b" && this.playerindex == -1 ) {
+                this.yourscore += 30;
+            } else {
+                this.yourscore -= 21;
+            }
+            this.submitHighscores();
+        }
+
+
     }
 
 
@@ -1683,6 +1721,89 @@ export class Txstage extends Entity {
         return 0;
     }
 
+
+
+
+
+
+
+     //----------------------
+    async displayHighscores() {
+
+        let url = "https://tensaistudio.xyz/manaroyale/get_highscore.tcl";
+
+        const myaddress = await getUserAccount()
+        log("myaddress is " , myaddress);
+
+        let username = this.userID;
+        let useraddr = myaddress;
+
+
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: "username="+ username + "&useraddr=" + useraddr,
+            method: 'POST'
+        };
+
+        
+        try {
+            let resp = await fetch(url, fetchopt ).then(response => response.json())
+        
+            log("sent request to URL", url , "SUCCESS", resp );
+            let str = "";
+            let i;
+            for ( i = 0 ; i < resp.length ; i++ ) {
+                if ( i < 20 ) {
+                    str += ( i + 1 ) + "." + " " + resp[i]["username"] + "     " + resp[i]["score"] + "\n";
+                }
+                if ( parseInt( resp[i]["isyou"] ) == 1 ) {
+                    this.yourscore = parseInt(resp[i]["score"]);
+                    this.menu_labels["lbl7"].getComponent(TextShape).value = "Your Score " + resp[i]["score"];
+                }
+            }
+            this.menu_labels["lbl5"].getComponent(TextShape).value = "Highscores"
+            this.menu_labels["lbl6"].getComponent(TextShape).value = str;
+        } catch(err) {
+            log("error to do", url, fetchopt, err );
+        }
+        
+    }
+
+
+    //----------------------
+    async submitHighscores() {
+
+        let url = "https://tensaistudio.xyz/manaroyale/update_highscore.tcl";
+       
+        const myaddress = await getUserAccount()
+        log("myaddress is " , myaddress);
+
+        let username = this.userID;
+        let useraddr = myaddress;
+        let score    = this.yourscore;  
+            
+        let sig      = Utils.sha256(useraddr + "wibble" + score );
+
+        let fetchopt = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: "username="+ username + "&score="+ score + "&useraddr=" + useraddr+ "&sig=" + sig,
+            method: 'POST'
+        };
+        let _this = this;
+        try {
+            let resp = await fetch(url, fetchopt ).then(response => response.text())
+            log("sent request to URL", url , "SUCCESS", resp );
+            _this.displayHighscores();
+
+        } catch(err) {
+            log("error to do", url, fetchopt, err );
+        }
+   
+    }
 
 
     //-----------
@@ -1901,12 +2022,13 @@ export class Txstage extends Entity {
         this.ui3d_root.setParent( this );
         this.ui3d_root.addComponent( new Transform(
             {   
-                position: new Vector3( -6.5 , 4.5 , 0 )
+                position: new Vector3( -6.5 , 4.5 , -2 )
             }
         ) );
 
         // HEre doesn''t control , go to update_button_ui
-        this.ui3d_root.addComponent( new Billboard() );
+        //this.ui3d_root.addComponent( new Billboard() );
+        this.ui3d_root.getComponent( Transform ).rotation.eulerAngles = new Vector3(0 , 90 , 0 );
 
 
         let backboard = new Entity();
@@ -1914,13 +2036,32 @@ export class Txstage extends Entity {
         backboard.addComponent( new BoxShape() );
         backboard.addComponent( new Transform( 
             {
-                position: new Vector3( 0 , 1 , -1  ),
-                scale   : new Vector3( 7.4, 9,  0.1 ) 
+                position: new Vector3( 0 , 1 , -0.1  ),
+                scale   : new Vector3( 7.4, 13,  0.1 ) 
             }
         ));
         let material = new Material();
         material.albedoColor = Color3.FromInts(102, 77, 51);
         backboard.addComponent( material );
+
+
+        let backboard2 = new Entity();
+        backboard2.setParent( this.ui3d_root );
+        backboard2.addComponent( new BoxShape() );
+        backboard2.addComponent( new Transform( 
+            {
+                position: new Vector3(-6.2 , 1 , -0.1  ),
+                scale   : new Vector3( 5, 13,  0.1 ) 
+            }
+        ));
+        let material2 = new Material();
+        material2.albedoColor = Color3.FromInts(32, 18, 13);
+        backboard2.addComponent( material2 );
+
+
+
+
+
 
         let logo = new Entity();
 
@@ -1929,7 +2070,7 @@ export class Txstage extends Entity {
         logo.addComponent( new PlaneShape() );
         logo.addComponent( new Transform( 
             {
-                position: new Vector3( 0 , 6, -0.5 ),
+                position: new Vector3( 0 , 6, 0 ),
                 scale   : new Vector3( 5,  5, 5 )
             }
         ));
@@ -1994,8 +2135,48 @@ export class Txstage extends Entity {
 
 
        
+        // Highscores
+        this.menu_labels["lbl5"] = new Entity();
+        this.menu_labels["lbl5"].addComponent( new TextShape() );
+        this.menu_labels["lbl5"].addComponent( new Transform(
+            {
+                position:new Vector3( -6.2, 6.2 , 0 ),
+                scale   :new Vector3( 0.45, 0.45, 0.45 )
+            }
+        ));
+
+        this.menu_labels["lbl5"].getComponent( TextShape ).color = Color3.White();
+        this.menu_labels["lbl5"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+        this.menu_labels["lbl5"].setParent( this.ui3d_root );
 
 
+        this.menu_labels["lbl6"] = new Entity();
+        this.menu_labels["lbl6"].addComponent( new TextShape() );
+        this.menu_labels["lbl6"].addComponent( new Transform(
+            {
+                position:new Vector3( -4.5, 5.0 , 0 ),
+                scale   :new Vector3( 0.3, 0.3, 0.3 )
+            }
+        ));
+
+        this.menu_labels["lbl6"].getComponent( TextShape ).color = Color3.White();
+        this.menu_labels["lbl6"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+        this.menu_labels["lbl6"].setParent( this.ui3d_root );
+        this.menu_labels["lbl6"].getComponent( TextShape ).hTextAlign = "left";
+        this.menu_labels["lbl6"].getComponent( TextShape ).vTextAlign = "top";
+            
+        
+        this.menu_labels["lbl7"] = new Entity();
+        this.menu_labels["lbl7"].addComponent( new TextShape() );
+        this.menu_labels["lbl7"].addComponent( new Transform(
+            {
+                position:new Vector3( 0.0, 3.0 , 0 ),
+                scale   :new Vector3( 0.3, 0.3, 0.3 )
+            }
+        ));
+        this.menu_labels["lbl7"].getComponent( TextShape ).color = Color3.White();
+        this.menu_labels["lbl7"].getComponent( Transform ).rotation.eulerAngles = new Vector3(0,180,0);
+        this.menu_labels["lbl7"].setParent( this.ui3d_root );
 
 
 
@@ -2003,7 +2184,7 @@ export class Txstage extends Entity {
             0,
             this,
             {
-                position: new Vector3( -4 ,11 , 0),
+                position: new Vector3( -4 ,10 , 0),
                 scale   : new Vector3( 1 , 1 , 1 ),
             }
         )
@@ -2440,6 +2621,7 @@ export class Txstage extends Entity {
         material.transparencyMode  = 2;
         this.shared_clock_material = material; 
 
+        this.shared_billboard = new Billboard();
 
     }
 
@@ -2957,7 +3139,13 @@ export class Txstage extends Entity {
 
         log( "Removing unit", u.id );
 
-        this.world.DestroyBody( u.box2dbody );
+        
+        try {
+            this.world.DestroyBody( u.box2dbody );
+        } catch (error) {
+            log( u.id, "Error this.world.DestroyBody", error, "nvm continue.");
+        }
+
         engine.removeEntity( this.units[ u.id ] );
         this.units[ u.id ] = null;
 
@@ -3637,8 +3825,7 @@ export class Txstage extends Entity {
         fixDef.density      = 20;
         fixDef.friction     = 100;
         fixDef.restitution  = 0.3;
-        fixDef.linearDamping = 0;
-
+       
 
         fixDef.shape        = new b2CircleShape(radius);
         
